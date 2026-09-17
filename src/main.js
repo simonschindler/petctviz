@@ -26,6 +26,7 @@ async function start() {
     datasetId: Object.keys(manifest.datasets)[0],
     subjectId: null,
     colormap: "pet",
+    scale: "log",
     threshold: manifest.suvRange[0],
     fadeWidth: 0,
     organVisible: { 0: true, 1: true },
@@ -41,8 +42,8 @@ async function start() {
   }
 
   function applyColorFn() {
-    viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange));
-    renderLegend(legend, state.colormap, manifest.suvRange);
+    viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange, state.scale));
+    renderLegend(legend, state.colormap, manifest.suvRange, state.scale);
   }
 
   async function showSubject() {
@@ -57,7 +58,7 @@ async function start() {
       for (const [organId, visible] of Object.entries(state.organVisible)) {
         viewer.setOrganVisible(Number(organId), visible);
       }
-      viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange));
+      viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange, state.scale));
       viewer.setThreshold(state.threshold, state.fadeWidth);
       controls.setBounds(subject.bounds);
       status.textContent = `${state.subjectId} · ${subject.count} patches`;
@@ -86,6 +87,10 @@ async function start() {
     } else if (type === "colormap") {
       state.colormap = payload;
       applyColorFn();
+    } else if (type === "scale") {
+      state.scale = payload;
+      controls.setScale(payload);
+      applyColorFn();
     } else if (type === "organ") {
       state.organVisible[payload.organId] = payload.visible;
       viewer.setOrganVisible(payload.organId, payload.visible);
@@ -101,7 +106,7 @@ async function start() {
     }
   }
 
-  controls.setSuvRange(manifest.suvRange);
+  controls.setSuvRange(manifest.suvRange, state.scale);
   applyColorFn();
   selectDataset(state.datasetId);
 }

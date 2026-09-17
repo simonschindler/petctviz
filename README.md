@@ -48,6 +48,9 @@ npm run preview
 - **Dataset** switches among scan 1/2 and patch size 3/5.
 - **Subject** lists available subjects; missing subjects are shown disabled.
 - **Colormap** switches between PET hot, viridis, and grayscale.
+- **SUV scale** switches between logarithmic (the default) and linear. It
+  applies to the color ramp and to the spacing of the threshold and fade
+  sliders, so low SUV values get finer control.
 - **Heart / Liver** toggles each organ.
 - **SUV threshold** fades cubes below the value; **Fade width** controls how
   gradual that fade is (0 = hard cutoff).

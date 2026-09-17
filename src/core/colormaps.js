@@ -1,4 +1,4 @@
-import { normalizeSuv } from "./logic.js";
+import { makeScale } from "./logic.js";
 
 export const COLORMAPS = {
   pet: {
@@ -50,6 +50,7 @@ export function sampleColormap(name, t) {
   return stops[stops.length - 1][1].slice();
 }
 
-export function makeColorFn(name, range) {
-  return (suv) => sampleColormap(name, normalizeSuv(suv, range));
+export function makeColorFn(name, range, scaleMode = "linear") {
+  const scale = makeScale(scaleMode, range);
+  return (suv) => sampleColormap(name, scale.tOf(suv));
 }

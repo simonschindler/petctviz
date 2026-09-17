@@ -1,9 +1,11 @@
 import { COLORMAPS } from "../core/colormaps.js";
+import { makeScale } from "../core/logic.js";
 
 export function initControls(manifest, emit) {
   const datasetSelect = document.getElementById("dataset");
   const subjectSelect = document.getElementById("subject");
   const colormapSelect = document.getElementById("colormap");
+  const scaleSelect = document.getElementById("scale");
   const organBoxes = [document.getElementById("organ-0"), document.getElementById("organ-1")];
   const thresholdInput = document.getElementById("threshold");
   const thresholdValue = document.getElementById("threshold-value");
@@ -18,6 +20,23 @@ export function initControls(manifest, emit) {
 
   for (const input of Object.values(clipInputs)) input.disabled = true;
   clipReset.disabled = true;
+
+  let suvRange = [0, 1];
+  let scaleMode = scaleSelect.value;
+  let scale = makeScale(scaleMode, suvRange);
+  let currentThreshold = suvRange[0];
+  let currentFadeWidth = 0;
+
+  const thresholdFromSlider = () => scale.valueAt(Number(thresholdInput.value));
+  const fadeFromSlider = () => scale.valueAt(Number(fadeInput.value)) - suvRange[0];
+  const syncThresholdDisplay = () => {
+    thresholdValue.textContent = thresholdFromSlider().toFixed(2);
+    fadeValue.textContent = fadeFromSlider().toFixed(2);
+  };
+  const positionSliders = () => {
+    thresholdInput.value = String(scale.tOf(currentThreshold));
+    fadeInput.value = String(scale.tOf(currentFadeWidth + suvRange[0]));
+  };
 
   for (const [id, colormap] of Object.entries(COLORMAPS)) {
     const option = document.createElement("option");
@@ -36,16 +55,16 @@ export function initControls(manifest, emit) {
   datasetSelect.addEventListener("change", () => emit("dataset", datasetSelect.value));
   subjectSelect.addEventListener("change", () => emit("subject", subjectSelect.value));
   colormapSelect.addEventListener("change", () => emit("colormap", colormapSelect.value));
+  scaleSelect.addEventListener("change", () => emit("scale", scaleSelect.value));
   organBoxes.forEach((box, organId) => {
     box.addEventListener("change", () => emit("organ", { organId, visible: box.checked }));
   });
 
   const emitThreshold = () => {
-    const threshold = Number(thresholdInput.value);
-    const fadeWidth = Number(fadeInput.value);
-    thresholdValue.textContent = threshold.toFixed(2);
-    fadeValue.textContent = fadeWidth.toFixed(2);
-    emit("threshold", { threshold, fadeWidth });
+    currentThreshold = thresholdFromSlider();
+    currentFadeWidth = fadeFromSlider();
+    syncThresholdDisplay();
+    emit("threshold", { threshold: currentThreshold, fadeWidth: currentFadeWidth });
   };
   thresholdInput.addEventListener("input", emitThreshold);
   fadeInput.addEventListener("input", emitThreshold);
@@ -84,18 +103,25 @@ export function initControls(manifest, emit) {
       });
       clipReset.disabled = false;
     },
-    setSuvRange(range) {
-      const span = range[1] - range[0] || 1;
-      thresholdInput.min = String(range[0]);
-      thresholdInput.max = String(range[1]);
-      thresholdInput.step = String(span / 200);
-      thresholdInput.value = String(range[0]);
-      fadeInput.min = "0";
-      fadeInput.max = String(span);
-      fadeInput.step = String(span / 200);
-      fadeInput.value = "0";
-      thresholdValue.textContent = range[0].toFixed(2);
-      fadeValue.textContent = "0.00";
+    setSuvRange(range, mode = scaleMode) {
+      suvRange = range;
+      scaleMode = mode;
+      scale = makeScale(scaleMode, suvRange);
+      currentThreshold = suvRange[0];
+      currentFadeWidth = 0;
+      for (const input of [thresholdInput, fadeInput]) {
+        input.min = "0";
+        input.max = "1";
+        input.step = "0.001";
+      }
+      positionSliders();
+      syncThresholdDisplay();
+    },
+    setScale(mode) {
+      scaleMode = mode;
+      scale = makeScale(scaleMode, suvRange);
+      positionSliders();
+      syncThresholdDisplay();
     },
     setClinical(rows) {
       const table = document.getElementById("clinical-table");
