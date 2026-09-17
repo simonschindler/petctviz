@@ -4,6 +4,7 @@ import { curatedClinical } from "./core/logic.js";
 import { Viewer } from "./scene/viewer.js";
 import { initControls } from "./ui/controls.js";
 import { renderLegend } from "./ui/legend.js";
+import { attachTooltip } from "./ui/tooltip.js";
 
 const DATA_BASE = "data";
 const ORGAN_IDS = { heart: 0, liver: 1 };
@@ -15,6 +16,11 @@ async function start() {
   const manifest = await loadManifest(DATA_BASE);
   const clinical = await loadClinical(DATA_BASE);
   const viewer = new Viewer(document.getElementById("scene"));
+
+  const tooltipEl = document.getElementById("tooltip");
+  const ORGAN_NAMES = { 0: "heart", 1: "liver" };
+  let currentSubject = null;
+  attachTooltip(document.getElementById("scene"), tooltipEl, viewer, () => currentSubject);
 
   const state = {
     datasetId: Object.keys(manifest.datasets)[0],
@@ -43,6 +49,8 @@ async function start() {
     status.textContent = `loading ${state.subjectId}…`;
     try {
       const subject = await loadSubject(DATA_BASE, state.datasetId, state.subjectId);
+      subject.organNames = ORGAN_NAMES;
+      currentSubject = subject;
       viewer.setSubject(subject, edgeFor(state.datasetId));
       viewer.resetClip();
       viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange));
