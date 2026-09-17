@@ -105,9 +105,12 @@ def preprocess(data_dir, out_dir) -> dict:
             raise FileNotFoundError(f"missing dataset file: {path}")
 
         sheets = load_sheets(path)
-        present = sorted(sheets, key=natural_key)
+        present = sorted(
+            (subject for subject, sheet in sheets.items() if not sheet.empty),
+            key=natural_key,
+        )
         expected = [f"{meta['prefix']}{i}" for i in range(1, EXPECTED_SUBJECT_COUNT + 1)]
-        missing = [subject for subject in expected if subject not in sheets]
+        missing = [subject for subject in expected if subject not in present]
 
         dataset_dir = out_dir / dataset_id
         dataset_dir.mkdir(parents=True, exist_ok=True)
@@ -116,8 +119,6 @@ def preprocess(data_dir, out_dir) -> dict:
         subject_files = {}
         for subject in present:
             df = sheets[subject]
-            if df.empty:
-                continue
             if voxel_size is None:
                 voxel_size = voxel_size_mm(df)
             array = subject_to_array(df)

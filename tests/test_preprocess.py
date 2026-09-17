@@ -119,3 +119,21 @@ def test_preprocess_writes_binaries_and_manifest(tmp_path):
     assert len(raw) == 16 * 7 * 4
     assert manifest["organs"] == [{"id": 0, "name": "heart"}, {"id": 1, "name": "liver"}]
     assert manifest["suvRange"][0] > 0
+
+
+def test_preprocess_treats_empty_sheet_as_missing(tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    write_all_datasets(data_dir, ["HTRA1"], ["HTRB1"])
+    path = data_dir / "Healthy_quadra_scan_1_patch_size_5.xlsx"
+    with pd.ExcelWriter(path) as writer:
+        make_sheet("HTRA1").to_excel(writer, sheet_name="HTRA1", index=False)
+        pd.DataFrame().to_excel(writer, sheet_name="HTRA2", index=False)
+    out_dir = tmp_path / "out"
+
+    manifest = preprocess(data_dir, out_dir)
+
+    dataset = manifest["datasets"]["scan1_ps5"]
+    assert dataset["subjects"] == ["HTRA1"]
+    assert "HTRA2" in dataset["missing"]
+    assert not (out_dir / "scan1_ps5" / "HTRA2.bin").exists()
