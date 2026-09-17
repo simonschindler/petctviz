@@ -68,7 +68,7 @@ async function start() {
     const dataset = manifest.datasets[datasetId];
     controls.setSubjects(dataset.subjects, dataset.missing);
     state.subjectId = dataset.subjects[0] ?? null;
-    controls.setClinical(curatedClinical(clinical[state.subjectId]));
+    controls.setClinical(curatedClinical(clinical[state.subjectId] ?? null));
     showSubject();
   }
 
@@ -77,7 +77,7 @@ async function start() {
       selectDataset(payload);
     } else if (type === "subject") {
       state.subjectId = payload;
-      controls.setClinical(curatedClinical(clinical[payload]));
+      controls.setClinical(curatedClinical(clinical[payload] ?? null));
       showSubject();
     } else if (type === "colormap") {
       state.colormap = payload;
