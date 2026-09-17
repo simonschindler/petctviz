@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -137,3 +139,35 @@ def test_preprocess_treats_empty_sheet_as_missing(tmp_path):
     assert dataset["subjects"] == ["HTRA1"]
     assert "HTRA2" in dataset["missing"]
     assert not (out_dir / "scan1_ps5" / "HTRA2.bin").exists()
+
+
+import os
+from pathlib import Path
+
+REAL_DATA = Path(os.environ.get("PETCT_DATA_DIR", "/Users/simon/data/joels_petct_data"))
+
+
+@pytest.mark.skipif(
+    not (REAL_DATA / "Quadra_clinical_data_anonym.csv").exists(),
+    reason="real PET/CT data not available",
+)
+def test_real_data_preprocess(tmp_path):
+    manifest = preprocess(REAL_DATA, tmp_path)
+
+    scan1 = manifest["datasets"]["scan1_ps5"]
+    assert len(scan1["subjects"]) == 47
+    assert scan1["missing"] == []
+    assert scan1["voxelSizeMm"][0] == pytest.approx(1.52344, abs=1e-3)
+    assert scan1["voxelSizeMm"][2] == pytest.approx(2.0, abs=1e-3)
+
+    assert manifest["datasets"]["scan2_ps5"]["missing"] == ["HTRB8"]
+    assert manifest["datasets"]["scan2_ps3"]["missing"] == ["HTRB8"]
+
+    low, high = manifest["suvRange"]
+    assert low > 0
+    assert high < 100
+
+    assert (tmp_path / "clinical.json").exists()
+    clinical = json.loads((tmp_path / "clinical.json").read_text())
+    assert len(clinical) == 94
+    assert clinical["HTRA1"]["Cohort"] == "Healthy-testretest"
