@@ -32,8 +32,11 @@ Key observations:
 
 - Organs present: `heart`, `liver` only.
 - Patches are organ-masked points, not a full rectangular grid.
-- `patch_size` is a voxel stride: `ps5` gives ~7.61 mm center spacing,
-  `ps3` gives ~4.57 mm. Voxel size is ~1.522 mm.
+- `patch_size` is a voxel stride in voxel units. The voxel grid is
+  anisotropic: x/y voxel size ~1.52344 mm, z voxel size 2.0 mm (derived by
+  linear fit of voxel index vs. mm across all datasets). So `ps5` boxes are
+  7.617 × 7.617 × 10.0 mm and `ps3` boxes are 4.570 × 4.570 × 6.0 mm —
+  cubes in voxel space, anisotropic boxes in physical space.
 - SUV mean range across the dataset: ~0.19 to ~24.45.
 
 ## Decisions
@@ -63,9 +66,10 @@ Emitted files:
 - `public/data/manifest.json`
   - `datasets`: map of dataset id to metadata
     - dataset ids: `scan1_ps5`, `scan1_ps3`, `scan2_ps5`, `scan2_ps3`
-    - per dataset: `label`, `subjects` (available subject ids), `missing`
-      (expected-but-absent subject ids), `cubeEdgeMm` (median center spacing),
-      `organs`, and a per-subject index for lazy loading.
+    - per dataset: `label`, `patchSize`, `voxelSizeMm` (per-axis
+      `[x, y, z]`), `subjects` (available subject ids), `missing`
+      (expected-but-absent subject ids), `organs`, and a per-subject index
+      for lazy loading.
   - `organs`: global organ list with stable ids.
   - `suvRange`: global `[min, max]` used for a stable color scale.
 - `public/data/clinical.json`
@@ -76,9 +80,9 @@ Emitted files:
     `[x_mm, y_mm, z_mm, suv_mean, suv_min, suv_max, organ_id]`
   - ~75 KB per subject.
 
-Cube edge length is derived from the median spacing between adjacent patch
-centers within a dataset (7.61 mm for `ps5`, 4.57 mm for `ps3`) and stored once
-in the manifest.
+Cube edge lengths are computed from the dataset's `patchSize` and per-axis
+`voxelSizeMm` (edge = `patchSize` × voxel size on each axis), so the boxes
+reflect the true physical extent of each patch.
 
 ### Frontend modules
 
@@ -95,8 +99,8 @@ in the manifest.
 
 ### Rendering
 
-- One `InstancedMesh` per organ, positioned at patch centers, scaled to
-  `cubeEdgeMm`.
+- One `InstancedMesh` per organ, positioned at patch centers, scaled to the
+  per-axis patch extent (`patchSize × voxelSizeMm`).
 - Color: SUV mapped through the selected colormap over the global SUV range,
   with a legend. Scale is stable across subjects.
 - Fade: a threshold value plus a fade width. Cubes below the threshold ramp
