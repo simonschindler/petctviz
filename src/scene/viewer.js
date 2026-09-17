@@ -74,7 +74,7 @@ export class Viewer {
   }
 
   _render() {
-    requestAnimationFrame(this._render);
+    this._raf = requestAnimationFrame(this._render);
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
@@ -206,6 +206,7 @@ export class Viewer {
 
   dispose() {
     window.removeEventListener("resize", this._onResize);
+    cancelAnimationFrame(this._raf);
     this.clear();
     this.controls.dispose();
     this.renderer.dispose();
