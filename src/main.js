@@ -28,6 +28,7 @@ async function start() {
     colormap: "pet",
     threshold: manifest.suvRange[0],
     fadeWidth: 0,
+    organVisible: { 0: true, 1: true },
   };
 
   const controls = initControls(manifest, (type, payload) => {
@@ -53,6 +54,9 @@ async function start() {
       currentSubject = subject;
       viewer.setSubject(subject, edgeFor(state.datasetId));
       viewer.resetClip();
+      for (const [organId, visible] of Object.entries(state.organVisible)) {
+        viewer.setOrganVisible(Number(organId), visible);
+      }
       viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange));
       viewer.setThreshold(state.threshold, state.fadeWidth);
       controls.setBounds(subject.bounds);
@@ -83,6 +87,7 @@ async function start() {
       state.colormap = payload;
       applyColorFn();
     } else if (type === "organ") {
+      state.organVisible[payload.organId] = payload.visible;
       viewer.setOrganVisible(payload.organId, payload.visible);
     } else if (type === "threshold") {
       state.threshold = payload.threshold;
