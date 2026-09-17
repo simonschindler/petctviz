@@ -16,6 +16,9 @@ export function initControls(manifest, emit) {
   };
   const clipReset = document.getElementById("clip-reset");
 
+  for (const input of Object.values(clipInputs)) input.disabled = true;
+  clipReset.disabled = true;
+
   for (const [id, colormap] of Object.entries(COLORMAPS)) {
     const option = document.createElement("option");
     option.value = id;
@@ -77,7 +80,9 @@ export function initControls(manifest, emit) {
         input.max = String(bounds.max[index]);
         input.step = String((bounds.max[index] - bounds.min[index]) / 200 || 1);
         input.value = String(bounds.max[index]);
+        input.disabled = false;
       });
+      clipReset.disabled = false;
     },
     setSuvRange(range) {
       const span = range[1] - range[0] || 1;

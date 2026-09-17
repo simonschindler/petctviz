@@ -44,6 +44,7 @@ async function start() {
     try {
       const subject = await loadSubject(DATA_BASE, state.datasetId, state.subjectId);
       viewer.setSubject(subject, edgeFor(state.datasetId));
+      viewer.resetClip();
       viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange));
       viewer.setThreshold(state.threshold, state.fadeWidth);
       controls.setBounds(subject.bounds);
@@ -83,7 +84,7 @@ async function start() {
       viewer.setClip(payload.axis, payload.value);
     } else if (type === "resetClip") {
       viewer.resetClip();
-      controls.setBounds(viewer.subject.bounds);
+      if (viewer.subject) controls.setBounds(viewer.subject.bounds);
     }
   }
 
