@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PET/CT Patch Viewer</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div id="viewport">
+        <canvas id="scene"></canvas>
+        <div id="legend"></div>
+        <div id="tooltip" hidden></div>
+        <div id="status"></div>
+      </div>
+      <aside id="panel">
+        <h1>PET/CT Patch Viewer</h1>
+
+        <section>
+          <label for="dataset">Dataset</label>
+          <select id="dataset"></select>
+          <label for="subject">Subject</label>
+          <select id="subject"></select>
+        </section>
+
+        <section>
+          <label for="colormap">Colormap</label>
+          <select id="colormap"></select>
+          <div class="checks">
+            <label><input type="checkbox" id="organ-0" checked /> Heart</label>
+            <label><input type="checkbox" id="organ-1" checked /> Liver</label>
+          </div>
+        </section>
+
+        <section>
+          <label for="threshold">SUV threshold <output id="threshold-value"></output></label>
+          <input type="range" id="threshold" />
+          <label for="fade">Fade width <output id="fade-value"></output></label>
+          <input type="range" id="fade" />
+        </section>
+
+        <section>
+          <label for="clip-x">Clip X</label>
+          <input type="range" id="clip-x" />
+          <label for="clip-y">Clip Y</label>
+          <input type="range" id="clip-y" />
+          <label for="clip-z">Clip Z</label>
+          <input type="range" id="clip-z" />
+          <button id="clip-reset" type="button">Reset clip</button>
+        </section>
+
+        <section>
+          <h2>Clinical</h2>
+          <table id="clinical-table"></table>
+        </section>
+      </aside>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,160 @@
+:root {
+  color-scheme: dark;
+  --bg: #0b0d12;
+  --panel: #141822;
+  --border: #262c3a;
+  --text: #e6e9f0;
+  --muted: #8a93a6;
+  --accent: #5ec962;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+#app {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  height: 100%;
+}
+
+#viewport {
+  position: relative;
+  min-width: 0;
+}
+
+#scene {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+#panel {
+  overflow-y: auto;
+  border-left: 1px solid var(--border);
+  background: var(--panel);
+  padding: 16px;
+}
+
+#panel h1 {
+  font-size: 15px;
+  margin: 0 0 16px;
+}
+
+#panel h2 {
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+#panel section {
+  border-top: 1px solid var(--border);
+  padding: 12px 0;
+}
+
+#panel label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 0 4px;
+}
+
+#panel select,
+#panel input[type="range"],
+#panel button {
+  width: 100%;
+}
+
+#panel select,
+#panel button {
+  background: #1d2330;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+#panel button {
+  margin-top: 10px;
+  cursor: pointer;
+}
+
+.checks {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.checks label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+#clinical-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+#clinical-table td {
+  padding: 3px 0;
+  vertical-align: top;
+}
+
+#clinical-table td:first-child {
+  color: var(--muted);
+  padding-right: 8px;
+}
+
+#legend {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  background: rgba(20, 24, 34, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11px;
+  min-width: 160px;
+}
+
+#legend .bar {
+  height: 10px;
+  border-radius: 3px;
+  margin: 4px 0;
+}
+
+#legend .labels {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+}
+
+#tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(20, 24, 34, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+#status {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
