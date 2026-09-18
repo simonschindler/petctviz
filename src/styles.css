@@ -176,3 +176,45 @@ body {
   color: var(--muted);
   font-size: 12px;
 }
+
+.help {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 5px;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  cursor: help;
+  vertical-align: middle;
+}
+
+.help:hover,
+.help:focus {
+  color: var(--text);
+  border-color: var(--text);
+  outline: none;
+}
+
+.checks .help {
+  margin-left: 0;
+}
+
+#help-tooltip {
+  position: fixed;
+  z-index: 20;
+  max-width: 240px;
+  padding: 7px 9px;
+  background: rgba(20, 24, 34, 0.98);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}

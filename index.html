@@ -18,65 +18,65 @@
         <h1>PET/CT Patch Viewer</h1>
 
         <section>
-          <label for="dataset">Dataset</label>
+          <label for="dataset" data-help="Choose which scan and patch size to view: scan 1 or 2, with patch size 3 or 5 voxels.">Dataset</label>
           <select id="dataset"></select>
-          <label for="subject">Subject</label>
+          <label for="subject" data-help="Choose the subject to display. Subjects missing from this dataset are disabled.">Subject</label>
           <select id="subject"></select>
         </section>
 
         <section>
-          <label for="colormap">Colormap</label>
+          <label for="colormap" data-help="Color ramp used to map SUV to color: PET hot, viridis, or grayscale.">Colormap</label>
           <select id="colormap"></select>
-          <label for="scale">SUV scale</label>
+          <label for="scale" data-help="How SUV maps to color. Logarithmic gives low-uptake regions more color detail; linear is proportional.">SUV scale</label>
           <select id="scale">
             <option value="log">Logarithmic</option>
             <option value="linear">Linear</option>
           </select>
           <div class="checks">
-            <label><input type="checkbox" id="organ-0" checked /> Heart</label>
-            <label><input type="checkbox" id="organ-1" checked /> Liver</label>
+            <label data-help="Show or hide the heart patches."><input type="checkbox" id="organ-0" checked /> Heart</label>
+            <label data-help="Show or hide the liver patches."><input type="checkbox" id="organ-1" checked /> Liver</label>
           </div>
         </section>
 
         <section>
-          <label for="window-scope">Color window</label>
+          <label for="window-scope" data-help="Use one SUV color range for all organs (Global), or give each organ its own range (Per organ).">Color window</label>
           <select id="window-scope">
             <option value="global">Global</option>
             <option value="organ">Per organ</option>
           </select>
-          <label for="window-target" id="window-target-label">Organ</label>
+          <label for="window-target" id="window-target-label" data-help="Which organ the Min/Max sliders edit (only used in Per-organ scope).">Organ</label>
           <select id="window-target">
             <option value="heart">Heart</option>
             <option value="liver">Liver</option>
           </select>
-          <label for="window-preset">Preset</label>
+          <label for="window-preset" data-help="Percentile clipping for the color range: p1–p99 ignores the lowest and highest 1%; p5–p95 clips more; Full range uses the absolute min–max; Custom uses the sliders.">Preset</label>
           <select id="window-preset">
             <option value="p1p99">p1–p99</option>
             <option value="p5p95">p5–p95</option>
             <option value="full">Full range</option>
             <option value="custom">Custom</option>
           </select>
-          <label for="window-min">Min <output id="window-min-value"></output></label>
+          <label for="window-min" data-help="Lower SUV bound mapped to the start of the colormap. Values below it clamp to the first color.">Min <output id="window-min-value"></output></label>
           <input type="range" id="window-min" />
-          <label for="window-max">Max <output id="window-max-value"></output></label>
+          <label for="window-max" data-help="Upper SUV bound mapped to the end of the colormap. Values above it clamp to the last color.">Max <output id="window-max-value"></output></label>
           <input type="range" id="window-max" />
         </section>
 
         <section>
-          <label for="threshold">SUV threshold <output id="threshold-value"></output></label>
+          <label for="threshold" data-help="Cubes with SUV below this value fade out (fully hidden when fade width is 0).">SUV threshold <output id="threshold-value"></output></label>
           <input type="range" id="threshold" />
-          <label for="fade">Fade width <output id="fade-value"></output></label>
+          <label for="fade" data-help="How gradually cubes fade below the threshold. 0 is a hard cutoff; larger values fade more smoothly.">Fade width <output id="fade-value"></output></label>
           <input type="range" id="fade" />
         </section>
 
         <section>
-          <label for="clip-x">Clip X</label>
+          <label for="clip-x" data-help="Cut away everything with X greater than this coordinate.">Clip X</label>
           <input type="range" id="clip-x" />
-          <label for="clip-y">Clip Y</label>
+          <label for="clip-y" data-help="Cut away everything with Y greater than this coordinate.">Clip Y</label>
           <input type="range" id="clip-y" />
-          <label for="clip-z">Clip Z</label>
+          <label for="clip-z" data-help="Cut away everything with Z greater than this coordinate.">Clip Z</label>
           <input type="range" id="clip-z" />
-          <button id="clip-reset" type="button">Reset clip</button>
+          <button id="clip-reset" type="button" data-help="Restore the full volume by removing all clip planes.">Reset clip</button>
         </section>
 
         <section>

@@ -4,6 +4,7 @@ import { curatedClinical } from "./core/logic.js";
 import { resolveWindow } from "./core/window.js";
 import { Viewer } from "./scene/viewer.js";
 import { initControls } from "./ui/controls.js";
+import { initHelp } from "./ui/help.js";
 import { renderLegend } from "./ui/legend.js";
 import { attachTooltip } from "./ui/tooltip.js";
 
@@ -14,6 +15,7 @@ const status = document.getElementById("status");
 const legend = document.getElementById("legend");
 
 async function start() {
+  initHelp();
   const manifest = await loadManifest(DATA_BASE);
   const clinical = await loadClinical(DATA_BASE);
   const viewer = new Viewer(document.getElementById("scene"));
