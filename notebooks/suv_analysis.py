@@ -741,5 +741,54 @@ def _(age_corr, empty_columns, joined, mo):
     return
 
 
+@app.cell
+def _conclusions(mo):
+    mo.md(r"""
+    ## Conclusions
+
+    The flat appearance of the viewer's SUV coloring is **intrinsic to the data
+    and the global range**, not a rendering defect.
+
+    1. `suv_mean` is strongly right-skewed: median ≈ 3.46, ~78% below 4, while a
+       rare tail reaches 39.15. The global range
+       $[v_{\min}, v_{\max}] = [0.14951, 39.154]$ is set almost entirely by the
+       heart tail.
+    2. Under the linear colormap the central 90% of patches occupy only ≈6.6% of
+       the color range; under the logarithmic mapping ≈16.2%. This is exactly the
+       band width computed in section 7 via $t_{\mathrm{lin}}$ and
+       $t_{\mathrm{log}}$.
+    3. Liver is nearly uniform; heart carries the heavy tail. Per-subject medians
+       are stable and test–retest agreement is high, so the spread is anatomical
+       rather than noise.
+
+    **Recommendation.** Give the viewer an explicit SUV color window with a
+    percentile-clipped default (for example p1–p99, or p5–p95 for the most
+    aggressive contrast), optionally set per organ. With a p1–p99 window the
+    central 90% would occupy a far larger fraction of the colormap, resolving the
+    flat rendering without discarding the tail. Viewer implementation is out of
+    scope for this notebook.
+    """)
+    return
+
+
+@app.cell
+def _appendix(mo):
+    mo.md(r"""
+    ## Appendix — reproduce this notebook
+
+    Install dev dependencies: `uv sync`
+
+    Run interactively: `uv run marimo edit notebooks/suv_analysis.py`
+
+    Headless execution check (writes only to `/tmp`):
+    `uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html`
+
+    The data directory defaults to `/Users/simon/data/joels_petct_data` and can be
+    overridden with the `PETCT_DATA_DIR` environment variable:
+    `PETCT_DATA_DIR=/path/to/data uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html`
+    """)
+    return
+
+
 if __name__ == "__main__":
     app.run()
