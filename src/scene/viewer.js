@@ -7,10 +7,12 @@ import {
   opacityFragmentShader,
   opacityVertexShader,
 } from "./opacity-shader.js";
+import { sortBackToFront } from "./sort.js";
 
 function patchMaterial(clipPlanes) {
   const material = new THREE.MeshLambertMaterial({
     transparent: true,
+    depthWrite: false,
     clippingPlanes: clipPlanes,
   });
   material.onBeforeCompile = (shader) => {
@@ -56,6 +58,11 @@ export class Viewer {
     this.threshold = 0;
     this.fadeWidth = 0;
     this.raycaster = new THREE.Raycaster();
+    this._matrix = new THREE.Matrix4();
+    this._needsSort = false;
+    this.controls.addEventListener("change", () => {
+      this._needsSort = true;
+    });
 
     this._onResize = () => this.resize();
     window.addEventListener("resize", this._onResize);
@@ -75,6 +82,10 @@ export class Viewer {
   _render() {
     this._raf = requestAnimationFrame(this._render);
     this.controls.update();
+    if (this._needsSort) {
+      this._needsSort = false;
+      this._sortRecords();
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
@@ -95,25 +106,36 @@ export class Viewer {
       const geometry = new THREE.BoxGeometry(edge[0], edge[1], edge[2]);
       const material = patchMaterial(this.planeList);
       const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
-      const matrix = new THREE.Matrix4();
-      indices.forEach((patchIndex, instance) => {
-        const offset = patchIndex * 3;
-        matrix.makeTranslation(
-          subject.positions[offset],
-          subject.positions[offset + 1],
-          subject.positions[offset + 2],
-        );
-        mesh.setMatrixAt(instance, matrix);
-      });
       const opacity = new Float32Array(indices.length);
       geometry.setAttribute(OPACITY_ATTRIBUTE, new THREE.InstancedBufferAttribute(opacity, 1));
-      mesh.instanceMatrix.needsUpdate = true;
-      this.organMeshes.set(organId, { mesh, indices, opacity });
+      this.organMeshes.set(organId, { mesh, order: [...indices], opacity });
       this.group.add(mesh);
     }
+    this._frame();
+    this._sortRecords();
     this._applyColors();
     this._applyOpacity();
-    this._frame();
+  }
+
+  _writeMatrices(record) {
+    const positions = this.subject.positions;
+    const matrix = this._matrix;
+    record.order.forEach((patchIndex, instance) => {
+      const offset = patchIndex * 3;
+      matrix.makeTranslation(positions[offset], positions[offset + 1], positions[offset + 2]);
+      record.mesh.setMatrixAt(instance, matrix);
+    });
+    record.mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  _sortRecords() {
+    if (!this.subject) return;
+    const positions = this.subject.positions;
+    const origin = this.camera.position;
+    for (const record of this.organMeshes.values()) {
+      sortBackToFront(record.order, positions, origin);
+      this._writeMatrices(record);
+    }
   }
 
   _frame() {
@@ -136,7 +158,7 @@ export class Viewer {
     if (!this.subject) return;
     const color = new THREE.Color();
     for (const record of this.organMeshes.values()) {
-      record.indices.forEach((patchIndex, instance) => {
+      record.order.forEach((patchIndex, instance) => {
         const rgb = this.colorFn(this.subject.suvMean[patchIndex]);
         color.setRGB(rgb[0], rgb[1], rgb[2]);
         record.mesh.setColorAt(instance, color);
@@ -148,7 +170,7 @@ export class Viewer {
   _applyOpacity() {
     if (!this.subject) return;
     for (const record of this.organMeshes.values()) {
-      record.indices.forEach((patchIndex, instance) => {
+      record.order.forEach((patchIndex, instance) => {
         record.opacity[instance] = computeOpacity(
           this.subject.suvMean[patchIndex],
           this.threshold,
@@ -198,7 +220,7 @@ export class Viewer {
     if (hits.length === 0) return null;
     const hit = hits[0];
     for (const record of this.organMeshes.values()) {
-      if (record.mesh === hit.object) return record.indices[hit.instanceId];
+      if (record.mesh === hit.object) return record.order[hit.instanceId];
     }
     return null;
   }
