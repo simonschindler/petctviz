@@ -113,8 +113,6 @@ export class Viewer {
     }
     this._frame();
     this._sortRecords();
-    this._applyColors();
-    this._applyOpacity();
   }
 
   _writeMatrices(record) {
@@ -136,6 +134,8 @@ export class Viewer {
       sortBackToFront(record.order, positions, origin);
       this._writeMatrices(record);
     }
+    this._applyColors();
+    this._applyOpacity();
   }
 
   _frame() {
