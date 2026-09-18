@@ -415,5 +415,109 @@ def _(mo, np, subject_table):
     return
 
 
+@app.cell
+def _colorscale(np, patches, pd):
+    VMIN = float(patches["suv_mean"].min())
+    VMAX = float(patches["suv_mean"].max())
+
+    _percentiles = [1, 5, 25, 50, 75, 95, 99]
+    _q = np.percentile(patches["suv_mean"], _percentiles)
+    _t_lin = (_q - VMIN) / (VMAX - VMIN)
+    _t_log = (np.log1p(_q) - np.log1p(VMIN)) / (np.log1p(VMAX) - np.log1p(VMIN))
+    t_table = pd.DataFrame(
+        {"percentile": _percentiles, "v": _q, "t_lin": _t_lin, "t_log": _t_log}
+    )
+
+    _q25, _q75 = np.percentile(patches["suv_mean"], [25, 75])
+    _p5, _p95 = np.percentile(patches["suv_mean"], [5, 95])
+    band_iqr_lin = float((_q75 - _q25) / (VMAX - VMIN))
+    band_iqr_log = float((np.log1p(_q75) - np.log1p(_q25)) / (np.log1p(VMAX) - np.log1p(VMIN)))
+    band_90_lin = float((_p95 - _p5) / (VMAX - VMIN))
+    band_90_log = float((np.log1p(_p95) - np.log1p(_p5)) / (np.log1p(VMAX) - np.log1p(VMIN)))
+    return VMAX, VMIN, band_90_lin, band_90_log, band_iqr_lin, band_iqr_log, t_table
+
+
+@app.cell
+def _colorscale_equations(mo):
+    mo.md(r"""
+    ### Normalized colormap position
+
+    Let $v$ denote `suv_mean` and let $v_{\min}, v_{\max}$ be the global extents.
+    The linear and logarithmic normalized colormap positions are
+
+    $$t_{\mathrm{lin}}(v) = \frac{v - v_{\min}}{v_{\max} - v_{\min}},
+    \qquad
+    t_{\mathrm{log}}(v) = \frac{\ln(1+v) - \ln(1+v_{\min})}{\ln(1+v_{\max}) - \ln(1+v_{\min})}.$$
+
+    The width of a percentile band measured in $t$ is exactly the fraction of the
+    colormap that band consumes.
+    """)
+    return
+
+
+@app.cell
+def _(mo, t_table):
+    mo.vstack([mo.md("### Colormap position by percentile"), t_table])
+    return
+
+
+@app.cell
+def _(VMAX, VMIN, np, patches, plt, t_table):
+    _values = patches["suv_mean"].to_numpy(dtype=float)
+    _t_lin_all = (_values - VMIN) / (VMAX - VMIN)
+    _t_log_all = (np.log1p(_values) - np.log1p(VMIN)) / (np.log1p(VMAX) - np.log1p(VMIN))
+    _tt = t_table.set_index("percentile")
+
+    fig_colormap = plt.figure(figsize=(12, 7))
+    _grid = fig_colormap.add_gridspec(3, 1, height_ratios=[0.6, 2.2, 2.2], hspace=0.6)
+
+    _ax_strip = fig_colormap.add_subplot(_grid[0])
+    _ax_strip.imshow(np.linspace(0, 1, 512).reshape(1, -1), aspect="auto", cmap="hot")
+    _ax_strip.set_yticks([])
+    _ax_strip.set_xlabel("colormap position t")
+    _ax_strip.set_title("PET-hot colormap")
+
+    _ax_lin = fig_colormap.add_subplot(_grid[1])
+    _ax_lin.hist(_t_lin_all, bins=np.linspace(0, 1, 201), color="#2c7fb8")
+    _ax_lin.axvspan(_tt.loc[25, "t_lin"], _tt.loc[75, "t_lin"], color="orange", alpha=0.35, label="IQR")
+    _ax_lin.axvspan(_tt.loc[5, "t_lin"], _tt.loc[95, "t_lin"], color="red", alpha=0.15, label="p5–p95")
+    _ax_lin.set_title(
+        f"Linear mapping: IQR width {_tt.loc[75, 't_lin'] - _tt.loc[25, 't_lin']:.4f}, "
+        f"p5–p95 width {_tt.loc[95, 't_lin'] - _tt.loc[5, 't_lin']:.4f}"
+    )
+    _ax_lin.set_xlabel("t_lin")
+    _ax_lin.set_ylabel("patch count")
+    _ax_lin.legend()
+
+    _ax_log = fig_colormap.add_subplot(_grid[2])
+    _ax_log.hist(_t_log_all, bins=np.linspace(0, 1, 201), color="#1b9e77")
+    _ax_log.axvspan(_tt.loc[25, "t_log"], _tt.loc[75, "t_log"], color="orange", alpha=0.35, label="IQR")
+    _ax_log.axvspan(_tt.loc[5, "t_log"], _tt.loc[95, "t_log"], color="red", alpha=0.15, label="p5–p95")
+    _ax_log.set_title(
+        f"Log mapping: IQR width {_tt.loc[75, 't_log'] - _tt.loc[25, 't_log']:.4f}, "
+        f"p5–p95 width {_tt.loc[95, 't_log'] - _tt.loc[5, 't_log']:.4f}"
+    )
+    _ax_log.set_xlabel("t_log")
+    _ax_log.set_ylabel("patch count")
+    _ax_log.legend()
+
+    fig_colormap
+    return (fig_colormap,)
+
+
+@app.cell
+def _finding_colorscale(VMAX, VMIN, band_90_lin, band_90_log, band_iqr_lin, band_iqr_log, mo):
+    mo.md(
+        f"**Finding (color scale).** With $v_{{\\min}} = {VMIN:.5f}$ and "
+        f"$v_{{\\max}} = {VMAX:.3f}$, the central 50% of patches (IQR) occupy only "
+        f"**{100 * band_iqr_lin:.2f}%** of the colormap under $t_{{\\mathrm{{lin}}}}$ "
+        f"and **{100 * band_iqr_log:.2f}%** under $t_{{\\mathrm{{log}}}}$. The "
+        f"central 90% (p5–p95) occupies **{100 * band_90_lin:.2f}%** linear and "
+        f"**{100 * band_90_log:.2f}%** log. The remaining ~90% of the colormap is "
+        f"reserved for a rare tail, which is why the bulk renders flat."
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
