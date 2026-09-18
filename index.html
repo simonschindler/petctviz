@@ -39,6 +39,30 @@
         </section>
 
         <section>
+          <label for="window-scope">Color window</label>
+          <select id="window-scope">
+            <option value="global">Global</option>
+            <option value="organ">Per organ</option>
+          </select>
+          <label for="window-target" id="window-target-label">Organ</label>
+          <select id="window-target">
+            <option value="heart">Heart</option>
+            <option value="liver">Liver</option>
+          </select>
+          <label for="window-preset">Preset</label>
+          <select id="window-preset">
+            <option value="p1p99">p1–p99</option>
+            <option value="p5p95">p5–p95</option>
+            <option value="full">Full range</option>
+            <option value="custom">Custom</option>
+          </select>
+          <label for="window-min">Min <output id="window-min-value"></output></label>
+          <input type="range" id="window-min" />
+          <label for="window-max">Max <output id="window-max-value"></output></label>
+          <input type="range" id="window-max" />
+        </section>
+
+        <section>
           <label for="threshold">SUV threshold <output id="threshold-value"></output></label>
           <input type="range" id="threshold" />
           <label for="fade">Fade width <output id="fade-value"></output></label>

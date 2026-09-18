@@ -141,6 +141,22 @@ def test_preprocess_treats_empty_sheet_as_missing(tmp_path):
     assert not (out_dir / "scan1_ps5" / "HTRA2.bin").exists()
 
 
+def test_preprocess_computes_percentile_windows(tmp_path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    write_all_datasets(data_dir, ["HTRA1"], ["HTRB1"])
+    out_dir = tmp_path / "out"
+
+    manifest = preprocess(data_dir, out_dir)
+
+    windows = manifest["suvWindows"]
+    assert set(windows) == {"global", "organs"}
+    assert set(windows["organs"]) == {"heart", "liver"}
+    for spec in [windows["global"], *windows["organs"].values()]:
+        assert set(spec) == {"min", "p1", "p5", "p95", "p99", "max"}
+        assert spec["min"] <= spec["p1"] <= spec["p5"] <= spec["p95"] <= spec["p99"] <= spec["max"]
+
+
 import os
 from pathlib import Path
 
@@ -166,6 +182,12 @@ def test_real_data_preprocess(tmp_path):
     low, high = manifest["suvRange"]
     assert low > 0
     assert high < 100
+
+    windows = manifest["suvWindows"]
+    assert windows["global"]["p1"] == pytest.approx(1.361, abs=0.05)
+    assert windows["global"]["p99"] == pytest.approx(9.762, abs=0.05)
+    assert windows["organs"]["liver"]["p99"] == pytest.approx(4.97, abs=0.05)
+    assert windows["organs"]["heart"]["max"] == pytest.approx(39.154, abs=0.05)
 
     assert (tmp_path / "clinical.json").exists()
     clinical = json.loads((tmp_path / "clinical.json").read_text())

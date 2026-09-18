@@ -1,7 +1,7 @@
 import { sampleColormap } from "../core/colormaps.js";
 import { makeScale } from "../core/logic.js";
 
-export function renderLegend(container, colormapName, range, scaleMode = "linear") {
+function strip(colormapName, range, scaleMode) {
   const scale = makeScale(scaleMode, range);
   const gradient = [];
   for (let i = 0; i <= 20; i += 1) {
@@ -16,9 +16,21 @@ export function renderLegend(container, colormapName, range, scaleMode = "linear
       return `<span>${value < 1 ? value.toFixed(2) : value.toFixed(1)}</span>`;
     })
     .join("");
-  container.innerHTML = `
-    <div>SUV mean · ${scaleMode === "log" ? "log" : "linear"}</div>
+  return `
     <div class="bar" style="background: linear-gradient(90deg, ${gradient.join(", ")});"></div>
     <div class="ticks">${ticks}</div>
+  `;
+}
+
+export function renderLegend(container, colormapName, entries, scaleMode = "linear") {
+  const blocks = entries
+    .map(
+      ({ label, range }) =>
+        `<div class="legend-entry"><div class="legend-label">${label}</div>${strip(colormapName, range, scaleMode)}</div>`,
+    )
+    .join("");
+  container.innerHTML = `
+    <div class="legend-header">SUV mean · ${scaleMode === "log" ? "log" : "linear"}</div>
+    ${blocks}
   `;
 }

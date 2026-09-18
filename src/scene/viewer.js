@@ -108,7 +108,7 @@ export class Viewer {
       const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
       const opacity = new Float32Array(indices.length);
       geometry.setAttribute(OPACITY_ATTRIBUTE, new THREE.InstancedBufferAttribute(opacity, 1));
-      this.organMeshes.set(organId, { mesh, order: [...indices], opacity });
+      this.organMeshes.set(organId, { mesh, order: [...indices], opacity, organId });
       this.group.add(mesh);
     }
     this._frame();
@@ -159,7 +159,7 @@ export class Viewer {
     const color = new THREE.Color();
     for (const record of this.organMeshes.values()) {
       record.order.forEach((patchIndex, instance) => {
-        const rgb = this.colorFn(this.subject.suvMean[patchIndex]);
+        const rgb = this.colorFn(this.subject.suvMean[patchIndex], record.organId);
         color.setRGB(rgb[0], rgb[1], rgb[2]);
         record.mesh.setColorAt(instance, color);
       });

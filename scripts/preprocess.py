@@ -83,6 +83,20 @@ def build_clinical(csv_path) -> dict[str, dict]:
     return {row["Image_ID"]: row for row in df.to_dict(orient="records")}
 
 
+def percentile_window(values: list[np.ndarray]) -> dict[str, float]:
+    if not values:
+        return {"min": 0.0, "p1": 0.0, "p5": 0.0, "p95": 0.0, "p99": 0.0, "max": 0.0}
+    pooled = np.concatenate(values)
+    return {
+        "min": float(pooled.min()),
+        "p1": float(np.percentile(pooled, 1)),
+        "p5": float(np.percentile(pooled, 5)),
+        "p95": float(np.percentile(pooled, 95)),
+        "p99": float(np.percentile(pooled, 99)),
+        "max": float(pooled.max()),
+    }
+
+
 def preprocess(data_dir, out_dir) -> dict:
     data_dir = Path(data_dir)
     out_dir = Path(out_dir)
@@ -98,6 +112,10 @@ def preprocess(data_dir, out_dir) -> dict:
     }
     suv_min = float("inf")
     suv_max = float("-inf")
+    window_values: dict[str, list[np.ndarray]] = {
+        "global": [],
+        **{name: [] for name in ORGAN_IDS},
+    }
 
     for dataset_id, meta in DATASETS.items():
         path = data_dir / meta["file"]
@@ -127,6 +145,13 @@ def preprocess(data_dir, out_dir) -> dict:
             subject_files[subject] = f"{dataset_id}/{subject}.bin"
             suv_min = min(suv_min, float(array[:, 3].min()))
             suv_max = max(suv_max, float(array[:, 3].max()))
+            suv = array[:, 3]
+            window_values["global"].append(suv)
+            organ_ids = array[:, 6].astype(int)
+            for organ_name, organ_id in ORGAN_IDS.items():
+                mask = organ_ids == organ_id
+                if mask.any():
+                    window_values[organ_name].append(suv[mask])
 
         manifest["datasets"][dataset_id] = {
             "label": meta["label"],
@@ -138,6 +163,12 @@ def preprocess(data_dir, out_dir) -> dict:
         }
 
     manifest["suvRange"] = [suv_min, suv_max]
+    manifest["suvWindows"] = {
+        "global": percentile_window(window_values["global"]),
+        "organs": {
+            name: percentile_window(window_values[name]) for name in ORGAN_IDS
+        },
+    }
     clinical = build_clinical(data_dir / "Quadra_clinical_data_anonym.csv")
 
     (out_dir / "manifest.json").write_text(json.dumps(manifest, indent=2))

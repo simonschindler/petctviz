@@ -1,5 +1,6 @@
 import { COLORMAPS } from "../core/colormaps.js";
 import { makeScale } from "../core/logic.js";
+import { resolveWindow } from "../core/window.js";
 
 export function initControls(manifest, emit) {
   const datasetSelect = document.getElementById("dataset");
@@ -17,6 +18,49 @@ export function initControls(manifest, emit) {
     z: document.getElementById("clip-z"),
   };
   const clipReset = document.getElementById("clip-reset");
+  const windowScope = document.getElementById("window-scope");
+  const windowTarget = document.getElementById("window-target");
+  const windowTargetLabel = document.getElementById("window-target-label");
+  const windowPreset = document.getElementById("window-preset");
+  const windowMin = document.getElementById("window-min");
+  const windowMax = document.getElementById("window-max");
+  const windowMinValue = document.getElementById("window-min-value");
+  const windowMaxValue = document.getElementById("window-max-value");
+
+  let suvWindows = null;
+  const windowState = { scope: "global", preset: "p1p99", target: "heart", custom: {} };
+
+  const activeKey = () => (windowState.scope === "organ" ? windowState.target : "global");
+  const activeSpec = () => {
+    if (!suvWindows) return { min: 0, p1: 0, p5: 0, p95: 1, p99: 1, max: 1 };
+    return windowState.scope === "organ"
+      ? (suvWindows.organs?.[windowState.target] ?? suvWindows.global)
+      : suvWindows.global;
+  };
+  const updateWindowSliders = () => {
+    const spec = activeSpec();
+    const [low, high] = resolveWindow(suvWindows, windowState, windowState.target);
+    for (const input of [windowMin, windowMax]) {
+      input.min = String(spec.min);
+      input.max = String(spec.max);
+      input.step = String((spec.max - spec.min) / 500 || 0.01);
+    }
+    windowMin.value = String(low);
+    windowMax.value = String(high);
+    windowMinValue.textContent = low.toFixed(2);
+    windowMaxValue.textContent = high.toFixed(2);
+  };
+  const updateWindowTargetVisibility = () => {
+    const perOrgan = windowState.scope === "organ";
+    windowTarget.style.display = perOrgan ? "" : "none";
+    windowTargetLabel.style.display = perOrgan ? "" : "none";
+  };
+  const emitWindow = () =>
+    emit("window", {
+      scope: windowState.scope,
+      preset: windowState.preset,
+      custom: windowState.custom,
+    });
 
   for (const input of Object.values(clipInputs)) input.disabled = true;
   clipReset.disabled = true;
@@ -68,6 +112,36 @@ export function initControls(manifest, emit) {
   };
   thresholdInput.addEventListener("input", emitThreshold);
   fadeInput.addEventListener("input", emitThreshold);
+
+  windowScope.addEventListener("change", () => {
+    windowState.scope = windowScope.value;
+    updateWindowTargetVisibility();
+    updateWindowSliders();
+    emitWindow();
+  });
+  windowTarget.addEventListener("change", () => {
+    windowState.target = windowTarget.value;
+    updateWindowSliders();
+    emitWindow();
+  });
+  windowPreset.addEventListener("change", () => {
+    windowState.preset = windowPreset.value;
+    if (windowState.preset !== "custom") delete windowState.custom[activeKey()];
+    updateWindowSliders();
+    emitWindow();
+  });
+  const onWindowSlider = () => {
+    windowState.preset = "custom";
+    windowPreset.value = "custom";
+    const low = Number(windowMin.value);
+    const high = Number(windowMax.value);
+    windowState.custom[activeKey()] = [Math.min(low, high), Math.max(low, high)];
+    windowMinValue.textContent = Math.min(low, high).toFixed(2);
+    windowMaxValue.textContent = Math.max(low, high).toFixed(2);
+    emitWindow();
+  };
+  windowMin.addEventListener("input", onWindowSlider);
+  windowMax.addEventListener("input", onWindowSlider);
 
   for (const [axis, input] of Object.entries(clipInputs)) {
     input.addEventListener("input", () => emit("clip", { axis, value: Number(input.value) }));
@@ -122,6 +196,11 @@ export function initControls(manifest, emit) {
       scale = makeScale(scaleMode, suvRange);
       positionSliders();
       syncThresholdDisplay();
+    },
+    setSuvWindows(windows) {
+      suvWindows = windows;
+      updateWindowTargetVisibility();
+      updateWindowSliders();
     },
     setClinical(rows) {
       const table = document.getElementById("clinical-table");

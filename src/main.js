@@ -1,6 +1,7 @@
 import { loadClinical, loadManifest, loadSubject } from "./data/loader.js";
 import { makeColorFn } from "./core/colormaps.js";
 import { curatedClinical } from "./core/logic.js";
+import { resolveWindow } from "./core/window.js";
 import { Viewer } from "./scene/viewer.js";
 import { initControls } from "./ui/controls.js";
 import { renderLegend } from "./ui/legend.js";
@@ -30,6 +31,7 @@ async function start() {
     threshold: manifest.suvRange[0],
     fadeWidth: 0,
     organVisible: { 0: true, 1: true },
+    colorWindow: { scope: "global", preset: "p1p99", custom: {} },
   };
 
   const controls = initControls(manifest, (type, payload) => {
@@ -41,9 +43,33 @@ async function start() {
     return dataset.voxelSizeMm.map((size) => size * dataset.patchSize);
   }
 
+  function colorFnFor() {
+    const fns = {};
+    for (const [organId, name] of Object.entries(ORGAN_NAMES)) {
+      fns[organId] = makeColorFn(
+        state.colormap,
+        resolveWindow(manifest.suvWindows, state.colorWindow, name),
+        state.scale,
+      );
+    }
+    return (suv, organId) => (fns[organId] ?? fns[0])(suv);
+  }
+
+  function legendEntries() {
+    if (state.colorWindow.scope === "organ") {
+      return [
+        { label: "Heart", range: resolveWindow(manifest.suvWindows, state.colorWindow, "heart") },
+        { label: "Liver", range: resolveWindow(manifest.suvWindows, state.colorWindow, "liver") },
+      ];
+    }
+    return [
+      { label: "SUV mean", range: resolveWindow(manifest.suvWindows, state.colorWindow, "heart") },
+    ];
+  }
+
   function applyColorFn() {
-    viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange, state.scale));
-    renderLegend(legend, state.colormap, manifest.suvRange, state.scale);
+    viewer.setColorFn(colorFnFor());
+    renderLegend(legend, state.colormap, legendEntries(), state.scale);
   }
 
   async function showSubject() {
@@ -58,7 +84,7 @@ async function start() {
       for (const [organId, visible] of Object.entries(state.organVisible)) {
         viewer.setOrganVisible(Number(organId), visible);
       }
-      viewer.setColorFn(makeColorFn(state.colormap, manifest.suvRange, state.scale));
+      viewer.setColorFn(colorFnFor());
       viewer.setThreshold(state.threshold, state.fadeWidth);
       controls.setBounds(subject.bounds);
       status.textContent = `${state.subjectId} · ${subject.count} patches`;
@@ -91,6 +117,9 @@ async function start() {
       state.scale = payload;
       controls.setScale(payload);
       applyColorFn();
+    } else if (type === "window") {
+      state.colorWindow = payload;
+      applyColorFn();
     } else if (type === "organ") {
       state.organVisible[payload.organId] = payload.visible;
       viewer.setOrganVisible(payload.organId, payload.visible);
@@ -106,6 +135,7 @@ async function start() {
     }
   }
 
+  controls.setSuvWindows(manifest.suvWindows);
   controls.setSuvRange(manifest.suvRange, state.scale);
   applyColorFn();
   selectDataset(state.datasetId);
