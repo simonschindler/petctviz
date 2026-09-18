@@ -590,5 +590,62 @@ def _finding_testretest(dbar, loa_lower, loa_upper, mo, r, r_by_organ, sd):
     return
 
 
+@app.cell
+def _patch_size(np, patches, pd):
+    _rows = []
+    for (_scan, _patch_size), _group in patches.groupby(["scan", "patch_size"], sort=True):
+        _values = _group["suv_mean"].to_numpy(dtype=float)
+        _q25, _q75 = np.percentile(_values, [25, 75])
+        _rows.append(
+            {
+                "scan": int(_scan),
+                "patch_size": int(_patch_size),
+                "n": len(_values),
+                "p50": float(np.percentile(_values, 50)),
+                "iqr": float(_q75 - _q25),
+                "std": float(_values.std(ddof=1)),
+            }
+        )
+    patchsize_table = pd.DataFrame(_rows)
+    patchsize_table
+    return (patchsize_table,)
+
+
+@app.cell
+def _(np, patches, plt):
+    fig_patchsize, _axes_patchsize = plt.subplots(1, 2, figsize=(12, 4.5), sharey=True)
+    for _scan, _ax in zip([1, 2], _axes_patchsize):
+        _subset = patches[patches["scan"] == _scan]
+        for _patch_size in sorted(_subset["patch_size"].unique()):
+            _values = np.sort(_subset.loc[_subset["patch_size"] == _patch_size, "suv_mean"].to_numpy(dtype=float))
+            _ecdf = np.arange(1, len(_values) + 1) / len(_values)
+            _ax.plot(_values, _ecdf, lw=1.2, label=f"patch {_patch_size}")
+        _ax.set_xscale("log")
+        _ax.set_title(f"Scan {_scan}: ECDF by patch size")
+        _ax.set_xlabel("SUV (log scale, dimensionless)")
+        _ax.set_ylabel("fraction of patches")
+        _ax.legend(title="patch size")
+    fig_patchsize.tight_layout()
+    fig_patchsize
+    return (fig_patchsize,)
+
+
+@app.cell
+def _(mo, patchsize_table):
+    _t = patchsize_table.set_index(["scan", "patch_size"])
+    mo.md(
+        f"**Finding (patch size).** Within each scan the patch-5 distribution is "
+        f"narrower than the patch-3 distribution: scan 1 $\\mathrm{{IQR}}$ "
+        f"{_t.loc[(1, 5), 'iqr']:.3f} vs {_t.loc[(1, 3), 'iqr']:.3f}, "
+        f"$\\sigma$ {_t.loc[(1, 5), 'std']:.3f} vs {_t.loc[(1, 3), 'std']:.3f}; "
+        f"scan 2 $\\mathrm{{IQR}}$ "
+        f"{_t.loc[(2, 5), 'iqr']:.3f} vs {_t.loc[(2, 3), 'iqr']:.3f}. Larger patches "
+        f"average more voxels, so extreme voxel values are smoothed and the "
+        f"distribution compresses. The flat-coloring problem is therefore slightly "
+        f"worse for patch size 3."
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
