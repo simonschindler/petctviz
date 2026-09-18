@@ -239,5 +239,56 @@ def _finding_global(frac_gt10, frac_lt2, frac_lt4, global_pct, mo):
     return
 
 
+@app.cell
+def _per_dataset(np, patches, pd):
+    _rows = []
+    for _dataset_id in sorted(patches["dataset"].unique()):
+        _values = patches.loc[patches["dataset"] == _dataset_id, "suv_mean"].to_numpy(dtype=float)
+        _rows.append(
+            {
+                "dataset": _dataset_id,
+                "n": len(_values),
+                "p50": float(np.percentile(_values, 50)),
+                "p99": float(np.percentile(_values, 99)),
+                "max": float(_values.max()),
+            }
+        )
+    dataset_table = pd.DataFrame(_rows)
+    dataset_table
+    return (dataset_table,)
+
+
+@app.cell
+def _(np, patches, plt):
+    fig_dataset, _ax_dataset = plt.subplots(figsize=(7.5, 4.5))
+    for _dataset_id in sorted(patches["dataset"].unique()):
+        _values = np.sort(patches.loc[patches["dataset"] == _dataset_id, "suv_mean"].to_numpy(dtype=float))
+        _ecdf = np.arange(1, len(_values) + 1) / len(_values)
+        _ax_dataset.plot(_values, _ecdf, lw=1.2, label=_dataset_id)
+    _ax_dataset.set_xscale("log")
+    _ax_dataset.set_title("ECDF of SUV by dataset")
+    _ax_dataset.set_xlabel("SUV (log scale, dimensionless)")
+    _ax_dataset.set_ylabel("fraction of patches")
+    _ax_dataset.legend(title="dataset")
+    fig_dataset.tight_layout()
+    fig_dataset
+    return (fig_dataset,)
+
+
+@app.cell
+def _(dataset_table, mo):
+    _counts = dict(zip(dataset_table["dataset"], dataset_table["n"]))
+    _ratio = _counts["scan1_ps3"] / _counts["scan1_ps5"]
+    mo.md(
+        f"**Finding (per dataset).** The four datasets have nearly identical "
+        f"distributions ($\\mathrm{{p}}_{{50}} \\approx 3.5$, "
+        f"$\\mathrm{{p}}_{{99}} \\approx 9.3$–$10.0$). The patch-size-3 datasets "
+        f"contain about **{_ratio:.1f}×** more patches than the patch-size-5 "
+        f"datasets because a smaller cube fits more positions. The largest single "
+        f"value (**{dataset_table['max'].max():.3f}**) occurs in scan 2, patch size 3."
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
