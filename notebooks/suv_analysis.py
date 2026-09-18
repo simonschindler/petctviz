@@ -159,5 +159,84 @@ def _finding_integrity(mo, missing_subjects, sheet_counts, total):
     return
 
 
+@app.cell
+def _global_stats(np, patches):
+    v_all = patches["suv_mean"].to_numpy(dtype=float)
+    PCTS = [0, 0.1, 1, 5, 25, 50, 75, 90, 95, 99, 99.9, 100]
+    global_pct = np.percentile(v_all, PCTS)
+    frac_lt2 = float(np.mean(v_all < 2))
+    frac_lt4 = float(np.mean(v_all < 4))
+    frac_gt10 = float(np.mean(v_all > 10))
+    return PCTS, frac_gt10, frac_lt2, frac_lt4, global_pct, v_all
+
+
+@app.cell
+def _global_table(PCTS, frac_gt10, frac_lt2, frac_lt4, global_pct, mo, pd):
+    _percentile_table = pd.DataFrame({"percentile": PCTS, "suv_mean": global_pct})
+    _fraction_table = pd.DataFrame(
+        {
+            "criterion": ["suv_mean < 2", "suv_mean < 4", "suv_mean > 10"],
+            "fraction": [frac_lt2, frac_lt4, frac_gt10],
+            "percent": [100 * frac_lt2, 100 * frac_lt4, 100 * frac_gt10],
+        }
+    )
+    mo.vstack([mo.md("### Global percentiles"), _percentile_table, mo.md("### Tail fractions"), _fraction_table])
+    return
+
+
+@app.cell
+def _(global_pct, np, plt, v_all):
+    fig_global, _axes_global = plt.subplots(1, 2, figsize=(13, 4.5))
+
+    _axes_global[0].hist(v_all, bins=np.linspace(0, 40, 201), color="#2c7fb8")
+    _axes_global[0].set_yscale("log")
+    _axes_global[0].set_title("Global SUV distribution")
+    _axes_global[0].set_xlabel("SUV (dimensionless)")
+    _axes_global[0].set_ylabel("patch count (log scale)")
+    for _value, _label in [
+        (global_pct[2], "p1"),
+        (global_pct[3], "p5"),
+        (global_pct[5], "p50"),
+        (global_pct[8], "p95"),
+        (global_pct[9], "p99"),
+    ]:
+        _axes_global[0].axvline(_value, color="crimson", ls="--", lw=1)
+        _axes_global[0].text(_value, _axes_global[0].get_ylim()[1], _label, rotation=90, va="top", fontsize=8)
+
+    _sorted_v = np.sort(v_all)
+    _ecdf = np.arange(1, len(_sorted_v) + 1) / len(_sorted_v)
+    _axes_global[1].plot(_sorted_v, _ecdf, color="#2c7fb8")
+    _axes_global[1].set_xscale("log")
+    _axes_global[1].set_title("Empirical CDF")
+    _axes_global[1].set_xlabel("SUV (log scale, dimensionless)")
+    _axes_global[1].set_ylabel("fraction of patches")
+    for _value, _label in [
+        (global_pct[3], "p5"),
+        (global_pct[5], "p50"),
+        (global_pct[8], "p95"),
+        (global_pct[9], "p99"),
+    ]:
+        _axes_global[1].axvline(_value, color="crimson", ls="--", lw=1)
+        _axes_global[1].text(_value, 0.02, _label, fontsize=8)
+
+    fig_global.tight_layout()
+    fig_global
+    return (fig_global,)
+
+
+@app.cell
+def _finding_global(frac_gt10, frac_lt2, frac_lt4, global_pct, mo):
+    mo.md(
+        f"**Finding (global distribution).** The global `suv_mean` distribution is "
+        f"strongly right-skewed: median = **{global_pct[5]:.3f}**, p95 = "
+        f"**{global_pct[8]:.3f}**, p99 = **{global_pct[9]:.3f}**, maximum = "
+        f"**{global_pct[11]:.3f}**. Only **{100 * frac_lt2:.2f}%** of patches are "
+        f"below 2, **{100 * frac_lt4:.2f}%** are below 4, and "
+        f"**{100 * frac_gt10:.3f}%** exceed 10. The bulk sits in a narrow band near "
+        f"the median while a rare tail extends to {global_pct[11]:.2f}."
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
