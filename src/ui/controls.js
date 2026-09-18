@@ -2,7 +2,7 @@ import { COLORMAPS } from "../core/colormaps.js";
 import { makeScale } from "../core/logic.js";
 import { resolveWindow } from "../core/window.js";
 
-export function initControls(manifest, emit) {
+export function initControls(manifest, defaults, emit) {
   const datasetSelect = document.getElementById("dataset");
   const subjectSelect = document.getElementById("subject");
   const colormapSelect = document.getElementById("colormap");
@@ -28,7 +28,12 @@ export function initControls(manifest, emit) {
   const windowMaxValue = document.getElementById("window-max-value");
 
   let suvWindows = null;
-  const windowState = { scope: "global", preset: "p1p99", target: "heart", custom: {} };
+  const windowState = {
+    scope: defaults.colorWindow.scope,
+    preset: defaults.colorWindow.preset,
+    target: defaults.colorWindow.target,
+    custom: {},
+  };
 
   const activeKey = () => (windowState.scope === "organ" ? windowState.target : "global");
   const activeSpec = () => {
@@ -66,7 +71,7 @@ export function initControls(manifest, emit) {
   clipReset.disabled = true;
 
   let suvRange = [0, 1];
-  let scaleMode = scaleSelect.value;
+  let scaleMode = defaults.scale;
   let scale = makeScale(scaleMode, suvRange);
   let currentThreshold = suvRange[0];
   let currentFadeWidth = 0;
@@ -95,6 +100,16 @@ export function initControls(manifest, emit) {
     option.textContent = manifest.datasets[datasetId].label;
     datasetSelect.append(option);
   }
+
+  colormapSelect.value = defaults.colormap;
+  scaleSelect.value = defaults.scale;
+  datasetSelect.value = defaults.datasetId;
+  windowScope.value = defaults.colorWindow.scope;
+  windowTarget.value = defaults.colorWindow.target;
+  windowPreset.value = defaults.colorWindow.preset;
+  organBoxes.forEach((box, organId) => {
+    box.checked = defaults.organVisible[organId];
+  });
 
   datasetSelect.addEventListener("change", () => emit("dataset", datasetSelect.value));
   subjectSelect.addEventListener("change", () => emit("subject", subjectSelect.value));

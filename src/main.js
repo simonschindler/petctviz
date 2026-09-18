@@ -11,6 +11,13 @@ import { attachTooltip } from "./ui/tooltip.js";
 
 const DATA_BASE = "data";
 const ORGAN_IDS = { heart: 0, liver: 1 };
+const DEFAULTS = {
+  datasetId: "scan1_ps3",
+  colormap: "viridis",
+  scale: "log",
+  organVisible: { 0: false, 1: true },
+  colorWindow: { scope: "organ", preset: "p5p95", target: "liver" },
+};
 
 const status = document.getElementById("status");
 const legend = document.getElementById("legend");
@@ -28,17 +35,21 @@ async function start() {
   attachTooltip(document.getElementById("scene"), tooltipEl, viewer, () => currentSubject);
 
   const state = {
-    datasetId: Object.keys(manifest.datasets)[0],
+    datasetId: DEFAULTS.datasetId,
     subjectId: null,
-    colormap: "pet",
-    scale: "log",
+    colormap: DEFAULTS.colormap,
+    scale: DEFAULTS.scale,
     threshold: manifest.suvRange[0],
     fadeWidth: 0,
-    organVisible: { 0: true, 1: true },
-    colorWindow: { scope: "global", preset: "p1p99", custom: {} },
+    organVisible: { ...DEFAULTS.organVisible },
+    colorWindow: {
+      scope: DEFAULTS.colorWindow.scope,
+      preset: DEFAULTS.colorWindow.preset,
+      custom: {},
+    },
   };
 
-  const controls = initControls(manifest, (type, payload) => {
+  const controls = initControls(manifest, DEFAULTS, (type, payload) => {
     handle(type, payload);
   });
 
@@ -173,7 +184,9 @@ async function start() {
   controls.setSuvWindows(manifest.suvWindows);
   controls.setSuvRange(manifest.suvRange, state.scale);
   applyColorFn();
-  selectDataset(state.datasetId);
+  selectDataset(
+    manifest.datasets[state.datasetId] ? state.datasetId : Object.keys(manifest.datasets)[0],
+  );
 }
 
 start().catch((error) => {
