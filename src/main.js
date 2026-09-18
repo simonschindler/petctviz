@@ -5,6 +5,7 @@ import { resolveWindow } from "./core/window.js";
 import { Viewer } from "./scene/viewer.js";
 import { initControls } from "./ui/controls.js";
 import { initHelp } from "./ui/help.js";
+import { renderHistogram } from "./ui/histogram.js";
 import { renderLegend } from "./ui/legend.js";
 import { attachTooltip } from "./ui/tooltip.js";
 
@@ -13,6 +14,7 @@ const ORGAN_IDS = { heart: 0, liver: 1 };
 
 const status = document.getElementById("status");
 const legend = document.getElementById("legend");
+const histogram = document.getElementById("histogram");
 
 async function start() {
   initHelp();
@@ -72,6 +74,35 @@ async function start() {
   function applyColorFn() {
     viewer.setColorFn(colorFnFor());
     renderLegend(legend, state.colormap, legendEntries(), state.scale);
+    updateHistogram();
+  }
+
+  function updateHistogram() {
+    const organs = [];
+    if (currentSubject) {
+      for (const [organId, name] of Object.entries(ORGAN_NAMES)) {
+        if (!state.organVisible[organId]) continue;
+        const id = Number(organId);
+        const values = [];
+        for (let i = 0; i < currentSubject.count; i += 1) {
+          if (currentSubject.organId[i] === id) values.push(currentSubject.suvMean[i]);
+        }
+        organs.push({
+          values,
+          window: resolveWindow(manifest.suvWindows, state.colorWindow, name),
+        });
+      }
+    }
+    const windowRange =
+      state.colorWindow.scope === "global"
+        ? resolveWindow(manifest.suvWindows, state.colorWindow, "heart")
+        : null;
+    renderHistogram(histogram, {
+      organs,
+      scaleMode: state.scale,
+      colormapName: state.colormap,
+      windowRange,
+    });
   }
 
   async function showSubject() {
@@ -90,6 +121,7 @@ async function start() {
       viewer.setThreshold(state.threshold, state.fadeWidth);
       controls.setBounds(subject.bounds);
       status.textContent = `${state.subjectId} · ${subject.count} patches`;
+      updateHistogram();
     } catch (error) {
       status.textContent = `could not load ${state.subjectId}`;
       console.error(error);
@@ -125,6 +157,7 @@ async function start() {
     } else if (type === "organ") {
       state.organVisible[payload.organId] = payload.visible;
       viewer.setOrganVisible(payload.organId, payload.visible);
+      updateHistogram();
     } else if (type === "threshold") {
       state.threshold = payload.threshold;
       state.fadeWidth = payload.fadeWidth;

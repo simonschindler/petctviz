@@ -177,6 +177,21 @@ body {
   font-size: 12px;
 }
 
+#histogram {
+  position: absolute;
+  left: 12px;
+  top: 36px;
+  background: rgba(20, 24, 34, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px 2px;
+  pointer-events: none;
+}
+
+#histogram svg {
+  display: block;
+}
+
 .help {
   display: inline-flex;
   align-items: center;
