@@ -758,8 +758,9 @@ def _conclusions(mo):
        band width computed in section 7 via $t_{\mathrm{lin}}$ and
        $t_{\mathrm{log}}$.
     3. Liver is nearly uniform; heart carries the heavy tail. Per-subject medians
-       are stable and test–retest agreement is high, so the spread is anatomical
-       rather than noise.
+       are stable across subjects, and liver test–retest is strong
+       ($r \approx 0.83$) while heart is noisy ($r \approx 0.16$), so part of the
+       heart spread is measurement noise.
 
     **Recommendation.** Give the viewer an explicit SUV color window with a
     percentile-clipped default (for example p1–p99, or p5–p95 for the most
