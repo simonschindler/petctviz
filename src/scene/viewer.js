@@ -2,6 +2,11 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
 import { computeOpacity } from "../core/logic.js";
+import {
+  OPACITY_ATTRIBUTE,
+  opacityFragmentShader,
+  opacityVertexShader,
+} from "./opacity-shader.js";
 
 function patchMaterial(clipPlanes) {
   const material = new THREE.MeshLambertMaterial({
@@ -9,14 +14,8 @@ function patchMaterial(clipPlanes) {
     clippingPlanes: clipPlanes,
   });
   material.onBeforeCompile = (shader) => {
-    shader.vertexShader = `attribute float aOpacity;\nvarying float vOpacity;\n${shader.vertexShader}`.replace(
-      "#include <begin_vertex>",
-      "#include <begin_vertex>\nvOpacity = aOpacity;",
-    );
-    shader.fragmentShader = `varying float vOpacity;\n${shader.fragmentShader}`.replace(
-      "#include <dithering_fragment>",
-      "#include <dithering_fragment>\ngl_FragColor.a *= vOpacity;",
-    );
+    shader.vertexShader = opacityVertexShader(shader.vertexShader);
+    shader.fragmentShader = opacityFragmentShader(shader.fragmentShader);
   };
   return material;
 }
@@ -107,7 +106,7 @@ export class Viewer {
         mesh.setMatrixAt(instance, matrix);
       });
       const opacity = new Float32Array(indices.length);
-      geometry.setAttribute("aOpacity", new THREE.InstancedBufferAttribute(opacity, 1));
+      geometry.setAttribute(OPACITY_ATTRIBUTE, new THREE.InstancedBufferAttribute(opacity, 1));
       mesh.instanceMatrix.needsUpdate = true;
       this.organMeshes.set(organId, { mesh, indices, opacity });
       this.group.add(mesh);
@@ -156,7 +155,7 @@ export class Viewer {
           this.fadeWidth,
         );
       });
-      record.mesh.geometry.getAttribute("aOpacity").needsUpdate = true;
+      record.mesh.geometry.getAttribute(OPACITY_ATTRIBUTE).needsUpdate = true;
     }
   }
 
