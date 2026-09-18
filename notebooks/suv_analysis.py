@@ -702,7 +702,12 @@ def _(clinical, empty_columns, joined, mo, pd):
             ],
         }
     )
-    mo.vstack([mo.md("### Cohort composition"), _composition, mo.md("### Uptake patterns"), _pattern])
+    _empty_md = mo.md(
+        "**Empty clinical columns (all null for this cohort):** " + ", ".join(empty_columns)
+    )
+    mo.vstack(
+        [mo.md("### Cohort composition"), _composition, mo.md("### Uptake patterns"), _pattern, _empty_md]
+    )
     return
 
 
@@ -729,8 +734,9 @@ def _(age_corr, empty_columns, joined, mo):
         f"(heart $r$ = {age_corr['heart']:.3f}, liver $r$ = {age_corr['liver']:.3f}). "
         f"Uptake-pattern columns (`LV_uptake_pattern`, `Non_LV_pattern`, "
         f"`Liver_pattern`) are populated for most subjects. **{len(empty_columns)}** "
-        f"clinical columns are entirely empty for this healthy cohort, so any "
-        f"analysis depending on them is not possible here."
+        f"clinical columns are entirely empty for this healthy cohort (named in "
+        f"the composition cell above), so any analysis depending on them is not "
+        f"possible here."
     )
     return
 
