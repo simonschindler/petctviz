@@ -5,3 +5,4 @@ __pycache__/
 *.pyc
 .pytest_cache/
 public/data/
+__marimo__/

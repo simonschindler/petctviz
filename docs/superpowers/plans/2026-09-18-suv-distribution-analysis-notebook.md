@@ -1,3 +1,98 @@
+# SUV Distribution Analysis Notebook Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build a self-contained marimo notebook that re-derives the healthy PET/CT SUV distribution analysis directly from the four source `.xlsx` workbooks and the clinical CSV, proving that the viewer's flat coloring comes from the data's dynamic range.
+
+**Architecture:** A single marimo `.py` notebook (`notebooks/suv_analysis.py`) with small, single-purpose cells. One loading cell reads all four workbooks into a concatenated pandas DataFrame (`patches`); every later section consumes `patches` and renders a table/figure plus a LaTeX "Finding" markdown cell. A final acceptance cell asserts every expected value from the spec and renders a pass/fail table.
+
+**Tech Stack:** Python 3.11+ via `uv`; marimo 0.24.x; pandas, numpy, openpyxl (already present); matplotlib with the `Agg` backend.
+
+**Spec:** `docs/superpowers/specs/2026-09-18-suv-distribution-analysis-notebook-design.md`
+
+## Global Constraints
+
+- Notebook path is exactly `notebooks/suv_analysis.py`, marimo `.py` format. Do not convert to `.ipynb`.
+- Data directory defaults to `/Users/simon/data/joels_petct_data`, overridable with `PETCT_DATA_DIR`.
+- The notebook must not import from `src/` or `scripts/`; it reads the workbooks directly, never `public/data/*.bin`.
+- No network access, no writes outside a temp directory. Matplotlib must use the `Agg` backend.
+- No SUV rescaling or cleaning: values are analyzed verbatim. Normalization is only the display transform `t`.
+- Dataset ids are exactly: `scan1_ps5`, `scan1_ps3`, `scan2_ps5`, `scan2_ps3`.
+- Organs are exactly `heart`, `liver`.
+- Percentiles use NumPy defaults; iteration order is sorted; no randomness; fixed figure sizes.
+- No application file may be modified. `git status` at the end shows only `notebooks/suv_analysis.py`, `pyproject.toml`, and `uv.lock`.
+- Do not add code comments unless a step explicitly includes them.
+
+## Notebook construction convention
+
+Tasks 2–11 append cells to the existing notebook. In every such task, insert the new
+cells **immediately before** this final block, keeping the block last:
+
+```python
+if __name__ == "__main__":
+    app.run()
+```
+
+Every cell must list, as function parameters, exactly the variables it consumes from
+earlier cells, and must return (or render as its last expression) what later cells need.
+Markdown findings render by ending the cell body with `mo.md(...)`. Figures render by
+ending the cell body with the figure variable.
+
+**Unique names (important).** marimo raises `MultipleDefinitionError` when the same name
+is assigned in two different cells, even if it is only a loop or temporary local.
+Prefix every non-returned local variable with `_` (marimo treats underscore-prefixed
+names as cell-local); keep only the variables other cells consume unprefixed. The code
+below already follows this convention — do not drop the underscores.
+
+The verification command for every task is the headless export:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+**Expected:** exit code 0 and no output containing `Error`, `failed to execute`, or
+`Traceback`. The export reads ~1.3M rows and may take a few minutes.
+
+---
+
+### Task 1: Dev dependencies and notebook scaffold with data loading (Sections 1–2)
+
+**Files:**
+- Modify: `pyproject.toml`
+- Create: `notebooks/suv_analysis.py`
+- Modify (generated): `uv.lock`
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces (notebook cells):
+  - imports cell exports `Path`, `mo`, `natural_key`, `np`, `os`, `pd`, `plt`
+  - config cell exports `DATA_DIR`, `DATASETS`, `EXPECTED_SUBJECTS`
+  - load cell exports `missing_subjects`, `patches`, `sheet_counts`
+  - integrity cell exports `columns_ok`, `organs_ok`, `total`
+
+- [ ] **Step 1: Add marimo and matplotlib to the dev dependency group**
+
+Run:
+
+```bash
+uv add --dev marimo matplotlib
+```
+
+Expected: `pyproject.toml` gains `marimo` and `matplotlib` in `[dependency-groups] dev`, and `uv.lock` is updated.
+
+- [ ] **Step 2: Verify the tools import**
+
+Run:
+
+```bash
+uv run python -c "import marimo, matplotlib; matplotlib.use('Agg'); print('ok')"
+```
+
+Expected: prints `ok`.
+
+- [ ] **Step 3: Create `notebooks/suv_analysis.py` with the scaffold, title, loading, and integrity cells**
+
+```python
 import marimo
 
 __generated_with = "0.24.2"
@@ -24,7 +119,7 @@ def _imports():
     return Path, mo, natural_key, np, os, pd, plt
 
 
-@app.cell(hide_code=True)
+@app.cell
 def _title(mo):
     mo.md(r"""
     # SUV Distribution Analysis of Healthy PET/CT Patches
@@ -76,11 +171,11 @@ def _config(Path, os):
         },
     }
     EXPECTED_SUBJECTS = 47
-    return DATASETS, DATA_DIR, EXPECTED_SUBJECTS
+    return DATA_DIR, DATASETS, EXPECTED_SUBJECTS
 
 
 @app.cell
-def _load(DATASETS, DATA_DIR, EXPECTED_SUBJECTS, natural_key, pd):
+def _load(DATA_DIR, DATASETS, EXPECTED_SUBJECTS, natural_key, pd):
     _frames = []
     sheet_counts = {}
     missing_subjects = {}
@@ -105,7 +200,7 @@ def _load(DATASETS, DATA_DIR, EXPECTED_SUBJECTS, natural_key, pd):
 
 
 @app.cell
-def _integrity(DATASETS, missing_subjects, mo, patches, pd, sheet_counts):
+def _integrity(DATASETS, mo, missing_subjects, patches, pd, sheet_counts):
     _expected_columns = [
         "patient_id",
         "organ",
@@ -148,17 +243,52 @@ def _integrity(DATASETS, missing_subjects, mo, patches, pd, sheet_counts):
 
 
 @app.cell
-def _finding_integrity(missing_subjects, mo, total):
-    mo.md(f"""
-    **Finding (data integrity).** Scan 1 has 47 subjects and no missing "
+def _finding_integrity(mo, missing_subjects, sheet_counts, total):
+    mo.md(
+        f"**Finding (data integrity).** Scan 1 has 47 subjects and no missing "
         f"sheets in both patch sizes; scan 2 has 46 subjects with `HTRB8` absent "
         f"in both patch sizes (missing: `{missing_subjects['scan2_ps5']}`). The "
         f"workbooks contribute **{total:,}** patches in total. All columns match "
-        f"the specification and `organ` takes only the values heart and liver.
-    """)
+        f"the specification and `organ` takes only the values heart and liver."
+    )
     return
 
 
+if __name__ == "__main__":
+    app.run()
+```
+
+- [ ] **Step 4: Run the headless export to verify the notebook executes**
+
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no `Error` / `failed to execute` / `Traceback`. Open the HTML and confirm the summary table lists `scan1_ps5` 99,501; `scan1_ps3` 562,082; `scan2_ps5` 99,919; `scan2_ps3` 565,927, and total 1,327,429.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add pyproject.toml uv.lock notebooks/suv_analysis.py
+git commit -m "feat: add SUV analysis notebook scaffold and data loading"
+```
+
+---
+
+### Task 2: Global SUV distribution (Section 3)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `patches` from Task 1.
+- Produces: `PCTS`, `frac_gt10`, `frac_lt2`, `frac_lt4`, `global_pct`, `v_all`.
+
+- [ ] **Step 1: Append the global stats cell before the main guard**
+
+```python
 @app.cell
 def _global_stats(np, patches):
     v_all = patches["suv_mean"].to_numpy(dtype=float)
@@ -168,8 +298,11 @@ def _global_stats(np, patches):
     frac_lt4 = float(np.mean(v_all < 4))
     frac_gt10 = float(np.mean(v_all > 10))
     return PCTS, frac_gt10, frac_lt2, frac_lt4, global_pct, v_all
+```
 
+- [ ] **Step 2: Append the percentile and fraction table cell**
 
+```python
 @app.cell
 def _global_table(PCTS, frac_gt10, frac_lt2, frac_lt4, global_pct, mo, pd):
     _percentile_table = pd.DataFrame({"percentile": PCTS, "suv_mean": global_pct})
@@ -182,8 +315,11 @@ def _global_table(PCTS, frac_gt10, frac_lt2, frac_lt4, global_pct, mo, pd):
     )
     mo.vstack([mo.md("### Global percentiles"), _percentile_table, mo.md("### Tail fractions"), _fraction_table])
     return
+```
 
+- [ ] **Step 3: Append the histogram + ECDF figure cell**
 
+```python
 @app.cell
 def _(global_pct, np, plt, v_all):
     fig_global, _axes_global = plt.subplots(1, 2, figsize=(13, 4.5))
@@ -221,24 +357,58 @@ def _(global_pct, np, plt, v_all):
 
     fig_global.tight_layout()
     fig_global
-    return
+    return (fig_global,)
+```
 
+- [ ] **Step 4: Append the finding cell**
 
+```python
 @app.cell
 def _finding_global(frac_gt10, frac_lt2, frac_lt4, global_pct, mo):
-    mo.md(f"""
-    **Finding (global distribution).** The global `suv_mean` distribution is "
+    mo.md(
+        f"**Finding (global distribution).** The global `suv_mean` distribution is "
         f"strongly right-skewed: median $v_{{50}}$ = **{global_pct[5]:.3f}**, "
         f"$v_{{95}}$ = **{global_pct[8]:.3f}**, $v_{{99}}$ = **{global_pct[9]:.3f}**, "
         f"$v_{{\\max}}$ = **{global_pct[11]:.3f}**. Only "
         f"**{100 * frac_lt2:.2f}%** of patches have $v < 2$, "
         f"**{100 * frac_lt4:.2f}%** have $v < 4$, and "
         f"**{100 * frac_gt10:.3f}%** have $v > 10$. The bulk sits in a narrow band "
-        f"near the median while a rare tail extends to {global_pct[11]:.2f}.
-    """)
+        f"near the median while a rare tail extends to {global_pct[11]:.2f}."
+    )
     return
+```
 
+- [ ] **Step 5: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. The percentile table shows p50 ≈ 3.462, p99 ≈ 9.762, max 39.154; fractions ≈ 2.70%, 77.82%, 0.946%.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add global SUV distribution section"
+```
+
+---
+
+### Task 3: Per-dataset distribution (Section 4)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `patches`.
+- Produces: `dataset_table` with columns `dataset`, `n`, `p50`, `p99`, `max`.
+
+- [ ] **Step 1: Append the per-dataset table cell**
+
+```python
 @app.cell
 def _per_dataset(np, patches, pd):
     _rows = []
@@ -256,8 +426,11 @@ def _per_dataset(np, patches, pd):
     dataset_table = pd.DataFrame(_rows)
     dataset_table
     return (dataset_table,)
+```
 
+- [ ] **Step 2: Append the overlaid ECDF figure cell**
 
+```python
 @app.cell
 def _(np, patches, plt):
     fig_dataset, _ax_dataset = plt.subplots(figsize=(7.5, 4.5))
@@ -272,9 +445,12 @@ def _(np, patches, plt):
     _ax_dataset.legend(title="dataset")
     fig_dataset.tight_layout()
     fig_dataset
-    return
+    return (fig_dataset,)
+```
 
+- [ ] **Step 3: Append the finding cell**
 
+```python
 @app.cell
 def _(dataset_table, mo):
     _counts = dict(zip(dataset_table["dataset"], dataset_table["n"]))
@@ -288,8 +464,39 @@ def _(dataset_table, mo):
         f"value (**{dataset_table['max'].max():.3f}**) occurs in scan 2, patch size 3."
     )
     return
+```
 
+- [ ] **Step 4: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. Table shows the four datasets with the counts from Task 1; the ratio text reads ≈5.6×.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add per-dataset SUV distribution section"
+```
+
+---
+
+### Task 4: Per-organ distribution (Section 5)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `patches`.
+- Produces: `organ_table` with columns `organ`, `n`, `min`, `p50`, `p95`, `p99`, `max`.
+
+- [ ] **Step 1: Append the per-organ table cell**
+
+```python
 @app.cell
 def _per_organ(np, patches, pd):
     _rows = []
@@ -309,8 +516,11 @@ def _per_organ(np, patches, pd):
     organ_table = pd.DataFrame(_rows)
     organ_table
     return (organ_table,)
+```
 
+- [ ] **Step 2: Append the overlaid histogram figure cell**
 
+```python
 @app.cell
 def _(np, patches, plt):
     fig_organ, _ax_organ = plt.subplots(figsize=(8, 4.5))
@@ -325,9 +535,12 @@ def _(np, patches, plt):
     _ax_organ.legend(title="organ")
     fig_organ.tight_layout()
     fig_organ
-    return
+    return (fig_organ,)
+```
 
+- [ ] **Step 3: Append the finding cell**
 
+```python
 @app.cell
 def _(mo, organ_table):
     _table = organ_table.set_index("organ")
@@ -345,8 +558,39 @@ def _(mo, organ_table):
         f"while the liver occupies only the bottom few SUV units."
     )
     return
+```
 
+- [ ] **Step 4: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. Table shows heart n=320,940, p50≈2.99, p95≈8.97, p99≈16.01, max 39.154; liver n=1,006,489, p50≈3.55, p95≈4.56, p99≈4.97, max≈16.912.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add per-organ SUV distribution section"
+```
+
+---
+
+### Task 5: Per-subject distribution (Section 6)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `patches`.
+- Produces: `scan1` (scan 1, patch 5 subset) and `subject_table` with columns `subject`, `organ`, `n`, `min`, `median`, `p95`, `max`, `span`.
+
+- [ ] **Step 1: Append the per-subject table cell**
+
+```python
 @app.cell
 def _per_subject(np, patches, pd):
     scan1 = patches[patches["dataset"] == "scan1_ps5"]
@@ -368,8 +612,11 @@ def _per_subject(np, patches, pd):
     subject_table["span"] = subject_table["max"] - subject_table["min"]
     subject_table
     return scan1, subject_table
+```
 
+- [ ] **Step 2: Append the per-subject figure cell**
 
+```python
 @app.cell
 def _(np, plt, scan1, subject_table):
     fig_subject, _axes_subject = plt.subplots(1, 3, figsize=(15, 4.5))
@@ -397,9 +644,12 @@ def _(np, plt, scan1, subject_table):
 
     fig_subject.tight_layout()
     fig_subject
-    return
+    return (fig_subject,)
+```
 
+- [ ] **Step 3: Append the finding cell**
 
+```python
 @app.cell
 def _(mo, np, subject_table):
     _liver_span = subject_table.loc[subject_table["organ"] == "liver", "span"].to_numpy(dtype=float)
@@ -413,8 +663,39 @@ def _(mo, np, subject_table):
         f"subject-to-subject baseline shifts."
     )
     return
+```
 
+- [ ] **Step 4: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. The finding reports liver span median ≈2.88, p90 ≈4.13, max ≈14.58.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add per-subject SUV distribution section"
+```
+
+---
+
+### Task 6: Color-scale diagnosis (Section 7)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `patches`.
+- Produces: `VMIN`, `VMAX`, `band_iqr_lin`, `band_iqr_log`, `band_90_lin`, `band_90_log`, `t_table` with columns `percentile`, `v`, `t_lin`, `t_log`.
+
+- [ ] **Step 1: Append the `t` table cell**
+
+```python
 @app.cell
 def _colorscale(np, patches, pd):
     VMIN = float(patches["suv_mean"].min())
@@ -434,17 +715,12 @@ def _colorscale(np, patches, pd):
     band_iqr_log = float((np.log1p(_q75) - np.log1p(_q25)) / (np.log1p(VMAX) - np.log1p(VMIN)))
     band_90_lin = float((_p95 - _p5) / (VMAX - VMIN))
     band_90_log = float((np.log1p(_p95) - np.log1p(_p5)) / (np.log1p(VMAX) - np.log1p(VMIN)))
-    return (
-        VMAX,
-        VMIN,
-        band_90_lin,
-        band_90_log,
-        band_iqr_lin,
-        band_iqr_log,
-        t_table,
-    )
+    return VMAX, VMIN, band_90_lin, band_90_log, band_iqr_lin, band_iqr_log, t_table
+```
 
+- [ ] **Step 2: Append the equations markdown cell**
 
+```python
 @app.cell
 def _colorscale_equations(mo):
     mo.md(r"""
@@ -461,14 +737,20 @@ def _colorscale_equations(mo):
     colormap that band consumes.
     """)
     return
+```
 
+- [ ] **Step 3: Append the `t` table display cell**
 
+```python
 @app.cell
 def _(mo, t_table):
     mo.vstack([mo.md("### Colormap position by percentile"), t_table])
     return
+```
 
+- [ ] **Step 4: Append the colormap strip + histogram figure cell**
 
+```python
 @app.cell
 def _(VMAX, VMIN, np, patches, plt, t_table):
     _values = patches["suv_mean"].to_numpy(dtype=float)
@@ -510,31 +792,57 @@ def _(VMAX, VMIN, np, patches, plt, t_table):
     _ax_log.legend()
 
     fig_colormap
-    return
+    return (fig_colormap,)
+```
 
+- [ ] **Step 5: Append the finding cell**
 
+```python
 @app.cell
-def _finding_colorscale(
-    VMAX,
-    VMIN,
-    band_90_lin,
-    band_90_log,
-    band_iqr_lin,
-    band_iqr_log,
-    mo,
-):
-    mo.md(f"""
-    **Finding (color scale).** With $v_{{\\min}} = {VMIN:.5f}$ and "
+def _finding_colorscale(VMAX, VMIN, band_90_lin, band_90_log, band_iqr_lin, band_iqr_log, mo):
+    mo.md(
+        f"**Finding (color scale).** With $v_{{\\min}} = {VMIN:.5f}$ and "
         f"$v_{{\\max}} = {VMAX:.3f}$, the central 50% of patches (IQR) occupy only "
         f"**{100 * band_iqr_lin:.2f}%** of the colormap under $t_{{\\mathrm{{lin}}}}$ "
         f"and **{100 * band_iqr_log:.2f}%** under $t_{{\\mathrm{{log}}}}$. The "
         f"central 90% (p5–p95) occupies **{100 * band_90_lin:.2f}%** linear and "
         f"**{100 * band_90_log:.2f}%** log. The remaining ~90% of the colormap is "
-        f"reserved for a rare tail, which is why the bulk renders flat.
-    """)
+        f"reserved for a rare tail, which is why the bulk renders flat."
+    )
     return
+```
 
+- [ ] **Step 6: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. The `t` table matches p1 0.0311/0.2026 … p99 0.2464/0.6294; the figure titles report IQR widths 0.0233/0.0573 and p5–p95 widths 0.0656/0.1616.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add color-scale diagnosis section with t mapping"
+```
+
+---
+
+### Task 7: Test-retest scan 1 vs scan 2 (Section 8)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `patches`.
+- Produces: `dbar`, `loa_lower`, `loa_upper`, `paired` (columns `subject_index`, `organ`, `scan1`, `scan2`, `diff`), `r`, `r_by_organ` (`{"heart": float, "liver": float}`), `sd`.
+
+- [ ] **Step 1: Append the pairing and statistics cell**
+
+```python
 @app.cell
 def _test_retest(np, patches):
     _ps5 = patches[patches["patch_size"] == 5].copy()
@@ -558,8 +866,11 @@ def _test_retest(np, patches):
     loa_lower = dbar - 1.96 * sd
     loa_upper = dbar + 1.96 * sd
     return dbar, loa_lower, loa_upper, paired, r, r_by_organ, sd
+```
 
+- [ ] **Step 2: Append the scatter + Bland–Altman figure cell**
 
+```python
 @app.cell
 def _(dbar, loa_lower, loa_upper, paired, plt):
     fig_testretest, _axes_testretest = plt.subplots(1, 2, figsize=(12, 4.5))
@@ -584,9 +895,12 @@ def _(dbar, loa_lower, loa_upper, paired, plt):
 
     fig_testretest.tight_layout()
     fig_testretest
-    return
+    return (fig_testretest,)
+```
 
+- [ ] **Step 3: Append the finding cell**
 
+```python
 @app.cell
 def _finding_testretest(dbar, loa_lower, loa_upper, mo, r, r_by_organ, sd):
     mo.md(rf"""
@@ -604,8 +918,39 @@ def _finding_testretest(dbar, loa_lower, loa_upper, mo, r, r_by_organ, sd):
     between scans.
     """)
     return
+```
 
+- [ ] **Step 4: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. `paired` has 92 rows (46 subjects × 2 organs; the missing `HTRB8` drops out), the pooled $r \approx 0.40$ (liver $r \approx 0.83$, heart $r \approx 0.16$), and the Bland–Altman limits straddle 0.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add test-retest comparison section"
+```
+
+---
+
+### Task 8: Patch size comparison (Section 9)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `patches`.
+- Produces: `patchsize_table` with columns `scan`, `patch_size`, `n`, `p50`, `iqr`, `std`.
+
+- [ ] **Step 1: Append the spread table cell**
+
+```python
 @app.cell
 def _patch_size(np, patches, pd):
     _rows = []
@@ -625,8 +970,11 @@ def _patch_size(np, patches, pd):
     patchsize_table = pd.DataFrame(_rows)
     patchsize_table
     return (patchsize_table,)
+```
 
+- [ ] **Step 2: Append the overlaid ECDF figure cell**
 
+```python
 @app.cell
 def _(np, patches, plt):
     fig_patchsize, _axes_patchsize = plt.subplots(1, 2, figsize=(12, 4.5), sharey=True)
@@ -643,9 +991,12 @@ def _(np, patches, plt):
         _ax.legend(title="patch size")
     fig_patchsize.tight_layout()
     fig_patchsize
-    return
+    return (fig_patchsize,)
+```
 
+- [ ] **Step 3: Append the finding cell**
 
+```python
 @app.cell
 def _(mo, patchsize_table):
     _t = patchsize_table.set_index(["scan", "patch_size"])
@@ -661,8 +1012,39 @@ def _(mo, patchsize_table):
         f"worse for patch size 3."
     )
     return
+```
 
+- [ ] **Step 4: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. For each scan the patch-5 IQR and std are smaller than the patch-3 values.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add patch-size comparison section"
+```
+
+---
+
+### Task 9: Clinical linkage (Section 10)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `DATA_DIR`, `patches`.
+- Produces: `age_corr` (`{"heart": float, "liver": float}`), `clinical`, `empty_columns`, `joined`.
+
+- [ ] **Step 1: Append the clinical join cell**
+
+```python
 @app.cell
 def _clinical(DATA_DIR, np, patches, pd):
     clinical = pd.read_csv(DATA_DIR / "Quadra_clinical_data_anonym.csv", dtype=str)
@@ -682,8 +1064,11 @@ def _clinical(DATA_DIR, np, patches, pd):
         _valid = joined[["age", _organ]].dropna()
         age_corr[_organ] = float(np.corrcoef(_valid["age"], _valid[_organ])[0, 1])
     return age_corr, clinical, empty_columns, joined
+```
 
+- [ ] **Step 2: Append the cohort composition cell**
 
+```python
 @app.cell
 def _(clinical, empty_columns, joined, mo, pd):
     _composition = pd.DataFrame(
@@ -725,8 +1110,11 @@ def _(clinical, empty_columns, joined, mo, pd):
         [mo.md("### Cohort composition"), _composition, mo.md("### Uptake patterns"), _pattern, _empty_md]
     )
     return
+```
 
+- [ ] **Step 3: Append the age association figure cell**
 
+```python
 @app.cell
 def _(age_corr, joined, plt):
     fig_clinical, _axes_clinical = plt.subplots(1, 2, figsize=(12, 4.5))
@@ -738,13 +1126,16 @@ def _(age_corr, joined, plt):
         _ax.set_ylabel(f"per-subject {_organ} median SUV")
     fig_clinical.tight_layout()
     fig_clinical
-    return
+    return (fig_clinical,)
+```
 
+- [ ] **Step 4: Append the finding cell**
 
+```python
 @app.cell
 def _(age_corr, empty_columns, joined, mo):
-    mo.md(f"""
-    **Finding (clinical linkage).** The clinical CSV holds **{len(joined)}** "
+    mo.md(
+        f"**Finding (clinical linkage).** The clinical CSV holds **{len(joined)}** "
         f"subjects matching the scan-1 IDs. Age is available for all of them; the "
         f"association between per-subject organ median SUV and age is weak "
         f"(heart $r$ = {age_corr['heart']:.3f}, liver $r$ = {age_corr['liver']:.3f}). "
@@ -752,11 +1143,42 @@ def _(age_corr, empty_columns, joined, mo):
         f"`Liver_pattern`) are populated for most subjects. **{len(empty_columns)}** "
         f"clinical columns are entirely empty for this healthy cohort (named in "
         f"the composition cell above), so any analysis depending on them is not "
-        f"possible here.
-    """)
+        f"possible here."
+    )
     return
+```
 
+- [ ] **Step 5: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. `joined` has 47 rows, the cohort is `Healthy-testretest`, and both age correlations are printed.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add clinical linkage section"
+```
+
+---
+
+### Task 10: Conclusions and appendix (Sections 11–12)
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: nothing (static markdown).
+- Produces: nothing.
+
+- [ ] **Step 1: Append the conclusions markdown cell**
+
+```python
 @app.cell
 def _conclusions(mo):
     mo.md(r"""
@@ -786,8 +1208,11 @@ def _conclusions(mo):
     scope for this notebook.
     """)
     return
+```
 
+- [ ] **Step 2: Append the appendix markdown cell**
 
+```python
 @app.cell
 def _appendix(mo):
     mo.md(r"""
@@ -805,10 +1230,43 @@ def _appendix(mo):
     `PETCT_DATA_DIR=/path/to/data uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html`
     """)
     return
+```
 
+- [ ] **Step 3: Run the headless export and verify**
 
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. The HTML contains a "Conclusions" heading and an "Appendix" heading.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "docs: add conclusions and appendix to SUV analysis notebook"
+```
+
+---
+
+### Task 11: Acceptance assertions and final verification
+
+**Files:**
+- Modify: `notebooks/suv_analysis.py`
+
+**Interfaces:**
+- Consumes: `VMIN`, `VMAX`, `band_90_lin`, `band_90_log`, `band_iqr_lin`, `band_iqr_log`, `columns_ok`, `dataset_table`, `frac_gt10`, `frac_lt2`, `frac_lt4`, `global_pct`, `np`, `organs_ok`, `organ_table`, `subject_table`, `t_table`, `total`.
+- Produces: `result` (DataFrame with columns `group`, `check`, `actual`, `expected`, `pass`).
+
+- [ ] **Step 1: Append the acceptance checks cell**
+
+```python
 @app.cell
 def _acceptance(
+    VMIN,
+    VMAX,
     band_90_lin,
     band_90_log,
     band_iqr_lin,
@@ -821,8 +1279,8 @@ def _acceptance(
     global_pct,
     mo,
     np,
-    organ_table,
     organs_ok,
+    organ_table,
     pd,
     subject_table,
     t_table,
@@ -912,8 +1370,63 @@ def _acceptance(
         + ("" if _failed == 0 else f" — **{_failed} FAILED**")
     )
     mo.vstack([_header, result])
-    return
+    return (result,)
+```
 
+- [ ] **Step 2: Run the headless export and verify every group passes**
 
-if __name__ == "__main__":
-    app.run()
+Run:
+
+```bash
+uv run marimo export html notebooks/suv_analysis.py -o /tmp/suv_analysis.html
+```
+
+Expected: exit 0, no errors. Then read the rendered pass count from the HTML
+(the cell source is also embedded in the HTML, so search for the rendered
+"passed" header, not for the literal word `FAILED`):
+
+```bash
+grep -o "[0-9][0-9]* / [0-9][0-9]* passed" /tmp/suv_analysis.html
+```
+
+Expected: the same number on both sides (for example `65 / 65 passed`). If any
+group fails, investigate the reading logic before changing any expected value,
+and report the discrepancy (per the spec's delegation notes).
+
+- [ ] **Step 3: Confirm no application files were modified**
+
+Run:
+
+```bash
+git status --short
+```
+
+Expected: only `notebooks/suv_analysis.py`, `pyproject.toml`, and `uv.lock` appear (plus any pre-existing untracked files). No `src/`, `scripts/`, `index.html`, or `tests/` changes.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add notebooks/suv_analysis.py
+git commit -m "feat: add acceptance checks to SUV analysis notebook"
+```
+
+---
+
+## Self-Review
+
+**Spec coverage:**
+- Goals 1–2 (read workbooks, verify structure) → Task 1.
+- Goal 2 global/per-dataset/per-organ/per-subject → Tasks 2–5.
+- Goal 3 (`t` mapping, band widths) → Task 6.
+- Goal 4 (test-retest, patch size) → Tasks 7–8.
+- Goal 5 (clinical join) → Task 9.
+- Goal 6 (LaTeX findings, conclusions) → findings in Tasks 1–9, conclusions in Task 10.
+- Notebook structure sections 1–12 → Tasks 1–10 (section 11 conclusions, section 12 appendix).
+- Environment/placement (path, dev deps, Agg, headless) → Task 1, re-verified each task.
+- Acceptance criteria 1–5 → Tasks 1, 10, 11.
+- Acceptance criterion 6 (only notebook + pyproject/uv.lock changed) → Task 11 Step 3.
+- Expected values table → asserted in Task 11.
+
+**Placeholder scan:** no TBD/TODO; every step contains runnable code or a concrete command.
+
+**Type consistency:** `global_pct` index map is fixed by `PCTS = [0, 0.1, 1, 5, 25, 50, 75, 90, 95, 99, 99.9, 100]` (p1→2, p5→3, p25→4, p50→5, p75→6, p90→7, p95→8, p99→9, p99.9→10, max→11) and is used consistently in Tasks 2, 6, and 11. `dataset_table`, `organ_table`, `subject_table`, `t_table`, and `patchsize_table` column names match between producers (Tasks 3–8) and consumers (Tasks 9, 11).
