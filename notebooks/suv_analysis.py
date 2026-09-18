@@ -290,5 +290,62 @@ def _(dataset_table, mo):
     return
 
 
+@app.cell
+def _per_organ(np, patches, pd):
+    _rows = []
+    for _organ in sorted(patches["organ"].unique()):
+        _values = patches.loc[patches["organ"] == _organ, "suv_mean"].to_numpy(dtype=float)
+        _rows.append(
+            {
+                "organ": _organ,
+                "n": len(_values),
+                "min": float(_values.min()),
+                "p50": float(np.percentile(_values, 50)),
+                "p95": float(np.percentile(_values, 95)),
+                "p99": float(np.percentile(_values, 99)),
+                "max": float(_values.max()),
+            }
+        )
+    organ_table = pd.DataFrame(_rows)
+    organ_table
+    return (organ_table,)
+
+
+@app.cell
+def _(np, patches, plt):
+    fig_organ, _ax_organ = plt.subplots(figsize=(8, 4.5))
+    _bins_organ = np.linspace(0, 20, 201)
+    for _organ in sorted(patches["organ"].unique()):
+        _values = patches.loc[patches["organ"] == _organ, "suv_mean"].to_numpy(dtype=float)
+        _ax_organ.hist(_values, bins=_bins_organ, histtype="step", lw=1.5, label=_organ)
+    _ax_organ.set_yscale("log")
+    _ax_organ.set_title("SUV distribution by organ")
+    _ax_organ.set_xlabel("SUV (dimensionless)")
+    _ax_organ.set_ylabel("patch count (log scale)")
+    _ax_organ.legend(title="organ")
+    fig_organ.tight_layout()
+    fig_organ
+    return (fig_organ,)
+
+
+@app.cell
+def _(mo, organ_table):
+    _table = organ_table.set_index("organ")
+    _heart = _table.loc["heart"]
+    _liver = _table.loc["liver"]
+    mo.md(
+        f"**Finding (per organ).** Liver SUV is tightly concentrated and nearly "
+        f"uniform: $\\mathrm{{p}}_{{50}}$ = **{_liver['p50']:.2f}**, "
+        f"$\\mathrm{{p}}_{{95}}$ = **{_liver['p95']:.2f}**, "
+        f"$\\mathrm{{p}}_{{99}}$ = **{_liver['p99']:.2f}** (max {_liver['max']:.2f}). "
+        f"Heart SUV has a much heavier right tail: $\\mathrm{{p}}_{{50}}$ = "
+        f"**{_heart['p50']:.2f}**, $\\mathrm{{p}}_{{95}}$ = **{_heart['p95']:.2f}**, "
+        f"$\\mathrm{{p}}_{{99}}$ = **{_heart['p99']:.2f}**, max = "
+        f"**{_heart['max']:.2f}**. The global range is driven by the heart tail, "
+        f"while the liver occupies only the bottom few SUV units."
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
