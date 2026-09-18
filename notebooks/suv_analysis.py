@@ -533,11 +533,15 @@ def _test_retest(np, patches):
     )
     paired["diff"] = paired["scan1"] - paired["scan2"]
     r = float(np.corrcoef(paired["scan1"], paired["scan2"])[0, 1])
+    r_by_organ = {
+        _organ: float(np.corrcoef(_group["scan1"], _group["scan2"])[0, 1])
+        for _organ, _group in paired.groupby("organ")
+    }
     dbar = float(paired["diff"].mean())
     sd = float(paired["diff"].std(ddof=1))
     loa_lower = dbar - 1.96 * sd
     loa_upper = dbar + 1.96 * sd
-    return dbar, loa_lower, loa_upper, paired, r, sd
+    return dbar, loa_lower, loa_upper, paired, r, r_by_organ, sd
 
 
 @app.cell
@@ -568,16 +572,20 @@ def _(dbar, loa_lower, loa_upper, paired, plt):
 
 
 @app.cell
-def _finding_testretest(dbar, loa_lower, loa_upper, mo, r, sd):
+def _finding_testretest(dbar, loa_lower, loa_upper, mo, r, r_by_organ, sd):
     mo.md(rf"""
     **Finding (test–retest).** Pairing subjects by numeric index
     (`HTRAi` ↔ `HTRBi`, skipping the missing `HTRB8`) and comparing per-subject,
-    per-organ medians, the Pearson correlation is $r = {r:.3f}$. The mean
-    difference is $\bar d = {dbar:.3f}$ SUV units with $s_d = {sd:.3f}$, so the
-    95% limits of agreement $\bar d \pm 1.96\,s_d$ are
-    $[{loa_lower:.3f},\ {loa_upper:.3f}]$. Reproducibility is high, confirming
-    that the wide global range reflects between-organ and tail variation rather
-    than scan noise.
+    per-organ medians (46 subjects × 2 organs = 92 pairs), the pooled Pearson
+    correlation is $r = {r:.3f}$. The pooled value mixes two organs with
+    different spread: liver test–retest is strong
+    ($r = {r_by_organ['liver']:.3f}$) while heart is weak
+    ($r = {r_by_organ['heart']:.3f}$). The mean difference is
+    $\bar d = {dbar:.3f}$ SUV units with $s_d = {sd:.3f}$, so the 95% limits of
+    agreement $\bar d \pm 1.96\,s_d$ are
+    $[{loa_lower:.3f},\ {loa_upper:.3f}]$. Test–retest reproducibility is
+    therefore organ-dependent: the liver is stable while heart uptake is noisy
+    between scans.
     """)
     return
 
