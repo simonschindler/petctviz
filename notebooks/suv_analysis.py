@@ -790,5 +790,115 @@ def _appendix(mo):
     return
 
 
+@app.cell
+def _acceptance(
+    VMIN,
+    VMAX,
+    band_90_lin,
+    band_90_log,
+    band_iqr_lin,
+    band_iqr_log,
+    columns_ok,
+    dataset_table,
+    frac_gt10,
+    frac_lt2,
+    frac_lt4,
+    global_pct,
+    mo,
+    np,
+    organs_ok,
+    organ_table,
+    pd,
+    subject_table,
+    t_table,
+    total,
+):
+    _checks = []
+
+    def _add(group, name, actual, expected, tol):
+        _checks.append(
+            {
+                "group": group,
+                "check": name,
+                "actual": round(float(actual), 5),
+                "expected": expected,
+                "pass": abs(float(actual) - expected) <= tol,
+            }
+        )
+
+    _add("integrity", "total patches", total, 1327429, 0)
+    _add("integrity", "columns ok", int(columns_ok), 1, 0)
+    _add("integrity", "organs ok", int(organs_ok), 1, 0)
+
+    _add("global", "v_min", global_pct[0], 0.14951, 0.02)
+    _add("global", "p1", global_pct[2], 1.361, 0.02)
+    _add("global", "p5", global_pct[3], 2.296, 0.02)
+    _add("global", "p25", global_pct[4], 3.024, 0.02)
+    _add("global", "p50", global_pct[5], 3.462, 0.02)
+    _add("global", "p75", global_pct[6], 3.932, 0.02)
+    _add("global", "p95", global_pct[8], 4.853, 0.02)
+    _add("global", "p99", global_pct[9], 9.762, 0.02)
+    _add("global", "p99.9", global_pct[10], 19.742, 0.02)
+    _add("global", "v_max", global_pct[11], 39.154, 0.02)
+    _add("global", "frac<2", frac_lt2, 0.027, 0.002)
+    _add("global", "frac<4", frac_lt4, 0.7782, 0.002)
+    _add("global", "frac>10", frac_gt10, 0.00946, 0.001)
+
+    _ds = dataset_table.set_index("dataset")
+    for _dataset_id, _n, _p50, _p99, _vmax in [
+        ("scan1_ps5", 99501, 3.52, 9.36, 24.454),
+        ("scan1_ps3", 562082, 3.47, 9.74, 29.202),
+        ("scan2_ps5", 99919, 3.49, 9.34, 29.655),
+        ("scan2_ps3", 565927, 3.44, 9.95, 39.154),
+    ]:
+        _add("dataset", f"{_dataset_id} n", _ds.loc[_dataset_id, "n"], _n, 0)
+        _add("dataset", f"{_dataset_id} p50", _ds.loc[_dataset_id, "p50"], _p50, 0.02)
+        _add("dataset", f"{_dataset_id} p99", _ds.loc[_dataset_id, "p99"], _p99, 0.02)
+        _add("dataset", f"{_dataset_id} max", _ds.loc[_dataset_id, "max"], _vmax, 0.02)
+
+    _og = organ_table.set_index("organ")
+    for _organ, _n, _vmin, _p50, _p95, _p99, _vmax in [
+        ("heart", 320940, 0.288, 2.99, 8.97, 16.01, 39.154),
+        ("liver", 1006489, 0.150, 3.55, 4.56, 4.97, 16.912),
+    ]:
+        _add("organ", f"{_organ} n", _og.loc[_organ, "n"], _n, 0)
+        _add("organ", f"{_organ} min", _og.loc[_organ, "min"], _vmin, 0.02)
+        _add("organ", f"{_organ} p50", _og.loc[_organ, "p50"], _p50, 0.02)
+        _add("organ", f"{_organ} p95", _og.loc[_organ, "p95"], _p95, 0.02)
+        _add("organ", f"{_organ} p99", _og.loc[_organ, "p99"], _p99, 0.02)
+        _add("organ", f"{_organ} max", _og.loc[_organ, "max"], _vmax, 0.02)
+
+    _tt = t_table.set_index("percentile")
+    for _pct, _t_lin_expected, _t_log_expected in [
+        (1, 0.0311, 0.2026),
+        (5, 0.0550, 0.2964),
+        (25, 0.0737, 0.3526),
+        (50, 0.0849, 0.3817),
+        (75, 0.0970, 0.4099),
+        (95, 0.1206, 0.4580),
+        (99, 0.2464, 0.6294),
+    ]:
+        _add("colormap", f"p{_pct} t_lin", _tt.loc[_pct, "t_lin"], _t_lin_expected, 0.005)
+        _add("colormap", f"p{_pct} t_log", _tt.loc[_pct, "t_log"], _t_log_expected, 0.005)
+    _add("colormap", "IQR width lin", band_iqr_lin, 0.0233, 0.005)
+    _add("colormap", "IQR width log", band_iqr_log, 0.0573, 0.005)
+    _add("colormap", "p5-p95 width lin", band_90_lin, 0.0656, 0.005)
+    _add("colormap", "p5-p95 width log", band_90_log, 0.1616, 0.005)
+
+    _liver_span = subject_table.loc[subject_table["organ"] == "liver", "span"].to_numpy(dtype=float)
+    _add("subject", "liver span median", np.median(_liver_span), 2.88, 0.02)
+    _add("subject", "liver span p90", np.percentile(_liver_span, 90), 4.13, 0.02)
+    _add("subject", "liver span max", _liver_span.max(), 14.58, 0.02)
+
+    result = pd.DataFrame(_checks)
+    _failed = int((~result["pass"]).sum())
+    _header = mo.md(
+        f"## Acceptance checks\n\n**{len(result) - _failed} / {len(result)} passed**"
+        + ("" if _failed == 0 else f" — **{_failed} FAILED**")
+    )
+    mo.vstack([_header, result])
+    return (result,)
+
+
 if __name__ == "__main__":
     app.run()
