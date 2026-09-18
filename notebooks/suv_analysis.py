@@ -228,12 +228,13 @@ def _(global_pct, np, plt, v_all):
 def _finding_global(frac_gt10, frac_lt2, frac_lt4, global_pct, mo):
     mo.md(
         f"**Finding (global distribution).** The global `suv_mean` distribution is "
-        f"strongly right-skewed: median = **{global_pct[5]:.3f}**, p95 = "
-        f"**{global_pct[8]:.3f}**, p99 = **{global_pct[9]:.3f}**, maximum = "
-        f"**{global_pct[11]:.3f}**. Only **{100 * frac_lt2:.2f}%** of patches are "
-        f"below 2, **{100 * frac_lt4:.2f}%** are below 4, and "
-        f"**{100 * frac_gt10:.3f}%** exceed 10. The bulk sits in a narrow band near "
-        f"the median while a rare tail extends to {global_pct[11]:.2f}."
+        f"strongly right-skewed: median $v_{{50}}$ = **{global_pct[5]:.3f}**, "
+        f"$v_{{95}}$ = **{global_pct[8]:.3f}**, $v_{{99}}$ = **{global_pct[9]:.3f}**, "
+        f"$v_{{\\max}}$ = **{global_pct[11]:.3f}**. Only "
+        f"**{100 * frac_lt2:.2f}%** of patches have $v < 2$, "
+        f"**{100 * frac_lt4:.2f}%** have $v < 4$, and "
+        f"**{100 * frac_gt10:.3f}%** have $v > 10$. The bulk sits in a narrow band "
+        f"near the median while a rare tail extends to {global_pct[11]:.2f}."
     )
     return
 
