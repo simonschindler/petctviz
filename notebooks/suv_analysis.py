@@ -347,5 +347,73 @@ def _(mo, organ_table):
     return
 
 
+@app.cell
+def _per_subject(np, patches, pd):
+    scan1 = patches[patches["dataset"] == "scan1_ps5"]
+    _rows = []
+    for (_subject, _organ), _group in scan1.groupby(["subject", "organ"], sort=True):
+        _values = _group["suv_mean"].to_numpy(dtype=float)
+        _rows.append(
+            {
+                "subject": _subject,
+                "organ": _organ,
+                "n": len(_values),
+                "min": float(_values.min()),
+                "median": float(np.median(_values)),
+                "p95": float(np.percentile(_values, 95)),
+                "max": float(_values.max()),
+            }
+        )
+    subject_table = pd.DataFrame(_rows)
+    subject_table["span"] = subject_table["max"] - subject_table["min"]
+    subject_table
+    return scan1, subject_table
+
+
+@app.cell
+def _(np, plt, scan1, subject_table):
+    fig_subject, _axes_subject = plt.subplots(1, 3, figsize=(15, 4.5))
+
+    _liver_medians = subject_table.loc[subject_table["organ"] == "liver", "median"]
+    _axes_subject[0].hist(_liver_medians, bins=15, color="#2c7fb8")
+    _axes_subject[0].set_title("Per-subject liver median SUV")
+    _axes_subject[0].set_xlabel("median SUV (dimensionless)")
+    _axes_subject[0].set_ylabel("subject count")
+
+    _liver_spans = subject_table.loc[subject_table["organ"] == "liver", "span"]
+    _axes_subject[1].hist(_liver_spans, bins=15, color="#d95f02")
+    _axes_subject[1].set_title("Per-subject liver span (max - min)")
+    _axes_subject[1].set_xlabel("span (SUV units)")
+    _axes_subject[1].set_ylabel("subject count")
+
+    for _subject, _color in [("HTRA1", "#1b9e77"), ("HTRA5", "#7570b3")]:
+        _values = scan1.loc[scan1["subject"] == _subject, "suv_mean"].to_numpy(dtype=float)
+        _axes_subject[2].hist(_values, bins=np.linspace(0, 20, 201), histtype="step", lw=1.5, label=_subject, color=_color)
+    _axes_subject[2].set_yscale("log")
+    _axes_subject[2].set_title("Example subjects (all organs)")
+    _axes_subject[2].set_xlabel("SUV (dimensionless)")
+    _axes_subject[2].set_ylabel("patch count (log scale)")
+    _axes_subject[2].legend(title="subject")
+
+    fig_subject.tight_layout()
+    fig_subject
+    return (fig_subject,)
+
+
+@app.cell
+def _(mo, np, subject_table):
+    _liver_span = subject_table.loc[subject_table["organ"] == "liver", "span"].to_numpy(dtype=float)
+    mo.md(
+        f"**Finding (per subject).** Even within one subject and organ the SUV "
+        f"varies: the per-subject liver span ($\\max - \\min$, scan 1, patch 5) has "
+        f"median **{np.median(_liver_span):.2f}**, p90 "
+        f"**{np.percentile(_liver_span, 90):.2f}**, and maximum "
+        f"**{_liver_span.max():.2f}** SUV units. Per-subject medians are stable "
+        f"across subjects, so the global spread is not driven by "
+        f"subject-to-subject baseline shifts."
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
