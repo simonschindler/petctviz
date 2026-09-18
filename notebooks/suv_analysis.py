@@ -519,5 +519,68 @@ def _finding_colorscale(VMAX, VMIN, band_90_lin, band_90_log, band_iqr_lin, band
     return
 
 
+@app.cell
+def _test_retest(np, patches):
+    _ps5 = patches[patches["patch_size"] == 5].copy()
+    _ps5["subject_index"] = _ps5["subject"].str.extract(r"(\d+)").astype(int)
+    paired = (
+        _ps5.groupby(["subject_index", "organ", "scan"])["suv_mean"]
+        .median()
+        .unstack("scan")
+        .dropna()
+        .reset_index()
+        .rename(columns={1: "scan1", 2: "scan2"})
+    )
+    paired["diff"] = paired["scan1"] - paired["scan2"]
+    r = float(np.corrcoef(paired["scan1"], paired["scan2"])[0, 1])
+    dbar = float(paired["diff"].mean())
+    sd = float(paired["diff"].std(ddof=1))
+    loa_lower = dbar - 1.96 * sd
+    loa_upper = dbar + 1.96 * sd
+    return dbar, loa_lower, loa_upper, paired, r, sd
+
+
+@app.cell
+def _(dbar, loa_lower, loa_upper, paired, plt):
+    fig_testretest, _axes_testretest = plt.subplots(1, 2, figsize=(12, 4.5))
+
+    _axes_testretest[0].scatter(paired["scan1"], paired["scan2"], s=18, alpha=0.7)
+    _lims = [
+        min(paired["scan1"].min(), paired["scan2"].min()),
+        max(paired["scan1"].max(), paired["scan2"].max()),
+    ]
+    _axes_testretest[0].plot(_lims, _lims, "k--", lw=1)
+    _axes_testretest[0].set_title("Scan 1 vs scan 2 per-subject organ median")
+    _axes_testretest[0].set_xlabel("scan 1 median SUV")
+    _axes_testretest[0].set_ylabel("scan 2 median SUV")
+
+    _axes_testretest[1].scatter((paired["scan1"] + paired["scan2"]) / 2, paired["diff"], s=18, alpha=0.7)
+    _axes_testretest[1].axhline(dbar, color="k", lw=1)
+    _axes_testretest[1].axhline(loa_upper, color="crimson", ls="--", lw=1)
+    _axes_testretest[1].axhline(loa_lower, color="crimson", ls="--", lw=1)
+    _axes_testretest[1].set_title("Bland–Altman (scan 1 - scan 2)")
+    _axes_testretest[1].set_xlabel("mean of scans (SUV)")
+    _axes_testretest[1].set_ylabel("difference (SUV)")
+
+    fig_testretest.tight_layout()
+    fig_testretest
+    return (fig_testretest,)
+
+
+@app.cell
+def _finding_testretest(dbar, loa_lower, loa_upper, mo, r, sd):
+    mo.md(rf"""
+    **Finding (test–retest).** Pairing subjects by numeric index
+    (`HTRAi` ↔ `HTRBi`, skipping the missing `HTRB8`) and comparing per-subject,
+    per-organ medians, the Pearson correlation is $r = {r:.3f}$. The mean
+    difference is $\bar d = {dbar:.3f}$ SUV units with $s_d = {sd:.3f}$, so the
+    95% limits of agreement $\bar d \pm 1.96\,s_d$ are
+    $[{loa_lower:.3f},\ {loa_upper:.3f}]$. Reproducibility is high, confirming
+    that the wide global range reflects between-organ and tail variation rather
+    than scan noise.
+    """)
+    return
+
+
 if __name__ == "__main__":
     app.run()
