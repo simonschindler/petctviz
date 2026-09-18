@@ -647,5 +647,93 @@ def _(mo, patchsize_table):
     return
 
 
+@app.cell
+def _clinical(DATA_DIR, np, patches, pd):
+    clinical = pd.read_csv(DATA_DIR / "Quadra_clinical_data_anonym.csv", dtype=str)
+    _scan1_patches = patches[patches["dataset"] == "scan1_ps5"]
+    _subject_medians = (
+        _scan1_patches.groupby(["subject", "organ"])["suv_mean"]
+        .median()
+        .unstack("organ")
+        .reset_index()
+    )
+    joined = clinical.merge(_subject_medians, left_on="Image_ID", right_on="subject", how="inner")
+    joined["age"] = pd.to_numeric(joined["age"], errors="coerce")
+    joined["sex"] = pd.to_numeric(joined["sex"], errors="coerce")
+    empty_columns = [column for column in clinical.columns if clinical[column].isna().all()]
+    age_corr = {}
+    for _organ in ["heart", "liver"]:
+        _valid = joined[["age", _organ]].dropna()
+        age_corr[_organ] = float(np.corrcoef(_valid["age"], _valid[_organ])[0, 1])
+    return age_corr, clinical, empty_columns, joined
+
+
+@app.cell
+def _(clinical, empty_columns, joined, mo, pd):
+    _composition = pd.DataFrame(
+        {
+            "metric": [
+                "cohort rows",
+                "joined subjects",
+                "cohort",
+                "age mean",
+                "age range",
+                "sex counts",
+                "empty columns",
+            ],
+            "value": [
+                str(len(clinical)),
+                str(len(joined)),
+                ", ".join(sorted(clinical["Cohort"].dropna().unique())),
+                f"{joined['age'].mean():.1f}",
+                f"{joined['age'].min():.0f}–{joined['age'].max():.0f}",
+                str(joined["sex"].value_counts().to_dict()),
+                str(len(empty_columns)),
+            ],
+        }
+    )
+    _pattern = pd.DataFrame(
+        {
+            "pattern column": ["LV_uptake_pattern", "Non_LV_pattern", "Liver_pattern"],
+            "value counts": [
+                str(clinical["LV_uptake_pattern"].value_counts(dropna=False).to_dict()),
+                str(clinical["Non_LV_pattern"].value_counts(dropna=False).to_dict()),
+                str(clinical["Liver_pattern"].value_counts(dropna=False).to_dict()),
+            ],
+        }
+    )
+    mo.vstack([mo.md("### Cohort composition"), _composition, mo.md("### Uptake patterns"), _pattern])
+    return
+
+
+@app.cell
+def _(age_corr, joined, plt):
+    fig_clinical, _axes_clinical = plt.subplots(1, 2, figsize=(12, 4.5))
+    for _organ, _ax in zip(["heart", "liver"], _axes_clinical):
+        _valid = joined[["age", _organ]].dropna()
+        _ax.scatter(_valid["age"], _valid[_organ], s=18, alpha=0.7)
+        _ax.set_title(f"{_organ.capitalize()} median SUV vs age (r = {age_corr[_organ]:.3f})")
+        _ax.set_xlabel("age (years)")
+        _ax.set_ylabel(f"per-subject {_organ} median SUV")
+    fig_clinical.tight_layout()
+    fig_clinical
+    return (fig_clinical,)
+
+
+@app.cell
+def _(age_corr, empty_columns, joined, mo):
+    mo.md(
+        f"**Finding (clinical linkage).** The clinical CSV holds **{len(joined)}** "
+        f"subjects matching the scan-1 IDs. Age is available for all of them; the "
+        f"association between per-subject organ median SUV and age is weak "
+        f"(heart $r$ = {age_corr['heart']:.3f}, liver $r$ = {age_corr['liver']:.3f}). "
+        f"Uptake-pattern columns (`LV_uptake_pattern`, `Non_LV_pattern`, "
+        f"`Liver_pattern`) are populated for most subjects. **{len(empty_columns)}** "
+        f"clinical columns are entirely empty for this healthy cohort, so any "
+        f"analysis depending on them is not possible here."
+    )
+    return
+
+
 if __name__ == "__main__":
     app.run()
