@@ -1,8 +1,8 @@
-const FIELDS = 7;
-
-export function decodeSubject(buffer) {
+export function decodeSubject(buffer, options = {}) {
+  const stride = options.stride ?? 7;
+  const fixedOrgan = options.organId ?? 0;
   const flat = new Float32Array(buffer);
-  const count = Math.floor(flat.length / FIELDS);
+  const count = Math.floor(flat.length / stride);
   const positions = new Float32Array(count * 3);
   const suvMean = new Float32Array(count);
   const suvMin = new Float32Array(count);
@@ -13,17 +13,26 @@ export function decodeSubject(buffer) {
   const max = [-Infinity, -Infinity, -Infinity];
 
   for (let i = 0; i < count; i += 1) {
-    const offset = i * FIELDS;
+    const offset = i * stride;
     for (let axis = 0; axis < 3; axis += 1) {
       const value = flat[offset + axis];
       positions[i * 3 + axis] = value;
       if (value < min[axis]) min[axis] = value;
       if (value > max[axis]) max[axis] = value;
     }
-    suvMean[i] = flat[offset + 3];
-    suvMin[i] = flat[offset + 4];
-    suvMax[i] = flat[offset + 5];
-    const organ = flat[offset + 6] | 0;
+    let organ;
+    if (stride >= 7) {
+      suvMean[i] = flat[offset + 3];
+      suvMin[i] = flat[offset + 4];
+      suvMax[i] = flat[offset + 5];
+      organ = flat[offset + 6] | 0;
+    } else {
+      const value = flat[offset + 3];
+      suvMean[i] = value;
+      suvMin[i] = value;
+      suvMax[i] = value;
+      organ = fixedOrgan;
+    }
     organId[i] = organ;
     if (!byOrgan.has(organ)) byOrgan.set(organ, []);
     byOrgan.get(organ).push(i);
@@ -46,11 +55,11 @@ export function loadClinical(baseUrl = "data") {
   return fetchJson(`${baseUrl}/clinical.json`);
 }
 
-export async function loadSubject(baseUrl, datasetId, subjectId) {
+export async function loadSubject(baseUrl, datasetId, subjectId, options) {
   const response = await fetch(`${baseUrl}/${datasetId}/${subjectId}.bin`);
   if (!response.ok) {
     throw new Error(`failed to load subject ${subjectId}: ${response.status}`);
   }
   const buffer = await response.arrayBuffer();
-  return decodeSubject(buffer);
+  return decodeSubject(buffer, options);
 }

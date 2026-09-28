@@ -192,6 +192,11 @@ export function initControls(manifest, defaults, emit) {
       });
       clipReset.disabled = false;
     },
+    setOrganChecks(organVisible) {
+      organBoxes.forEach((box, organId) => {
+        box.checked = Boolean(organVisible[organId]);
+      });
+    },
     setSuvRange(range, mode = scaleMode) {
       suvRange = range;
       scaleMode = mode;

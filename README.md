@@ -1,8 +1,8 @@
 # petctviz
 
-A static browser-based 3D explorer for healthy PET/CT organ patch data. Renders
-heart and liver patches as SUV-colored cubes with axis clipping, threshold
-fade, hover inspection, and clinical metadata.
+A static browser-based 3D explorer for healthy PET/CT data. Renders organ
+patches (heart, liver) and high-resolution heart voxels as SUV-colored cubes
+with axis clipping, threshold fade, hover inspection, and clinical metadata.
 
 ## Requirements
 
@@ -14,12 +14,17 @@ fade, hover inspection, and clinical metadata.
 ```bash
 uv sync
 npm install
-npm run preprocess
+npm run preprocess        # patch datasets from the xlsx workbooks
+npm run preprocess:hires  # heart voxel datasets from the h5ad files (optional)
 ```
 
 `npm run preprocess` reads the source workbooks (default
 `/Users/simon/data/joels_petct_data`, override with `PETCT_DATA_DIR`) and writes
-`public/data/`. Generated data is not committed.
+the patch datasets. `npm run preprocess:hires` reads the AnnData per-voxel heart
+files (`Healthy_Test_Retest_First_Scan.h5ad` / `..._Second_Scan.h5ad`) and adds
+the `scan1_vox` / `scan2_vox` datasets; run it after `preprocess`.
+
+The generated `public/data/` is committed so the Docker image is self-contained.
 
 ## Develop
 
@@ -66,7 +71,8 @@ that data from the source workbooks, run `npm run preprocess` before building.
 
 ## Usage
 
-- **Dataset** switches among scan 1/2 and patch size 3/5.
+- **Dataset** switches among the patch datasets (scan 1/2 × patch size 3/5) and
+  the high-resolution heart voxel datasets (scan 1/2 · heart voxels).
 - **Subject** lists available subjects; missing subjects are shown disabled.
 - **Colormap** switches between PET hot, viridis, and grayscale.
 - **SUV scale** switches between logarithmic (the default) and linear. It

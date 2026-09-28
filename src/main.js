@@ -120,11 +120,20 @@ async function start() {
     if (!state.subjectId) return;
     status.textContent = `loading ${state.subjectId}…`;
     try {
-      const subject = await loadSubject(DATA_BASE, state.datasetId, state.subjectId);
+      const dataset = manifest.datasets[state.datasetId];
+      const subject = await loadSubject(DATA_BASE, state.datasetId, state.subjectId, {
+        stride: dataset.strideFloats ?? 7,
+        organId: 0,
+      });
       subject.organNames = ORGAN_NAMES;
       currentSubject = subject;
-      viewer.setSubject(subject, edgeFor(state.datasetId));
+      viewer.setSubject(subject, edgeFor(state.datasetId), dataset.mode === "voxel");
       viewer.resetClip();
+      const presentOrgans = [...subject.byOrgan.keys()];
+      if (!presentOrgans.some((organId) => state.organVisible[organId])) {
+        for (const organId of presentOrgans) state.organVisible[organId] = true;
+        controls.setOrganChecks(state.organVisible);
+      }
       for (const [organId, visible] of Object.entries(state.organVisible)) {
         viewer.setOrganVisible(Number(organId), visible);
       }

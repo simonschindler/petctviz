@@ -9,10 +9,10 @@ import {
 } from "./opacity-shader.js";
 import { sortBackToFront } from "./sort.js";
 
-function patchMaterial(clipPlanes) {
+function patchMaterial(clipPlanes, depthWrite) {
   const material = new THREE.MeshLambertMaterial({
     transparent: true,
-    depthWrite: false,
+    depthWrite,
     clippingPlanes: clipPlanes,
   });
   material.onBeforeCompile = (shader) => {
@@ -60,6 +60,7 @@ export class Viewer {
     this.raycaster = new THREE.Raycaster();
     this._matrix = new THREE.Matrix4();
     this._needsSort = false;
+    this.dense = false;
     this.controls.addEventListener("change", () => {
       this._needsSort = true;
     });
@@ -82,7 +83,7 @@ export class Viewer {
   _render() {
     this._raf = requestAnimationFrame(this._render);
     this.controls.update();
-    if (this._needsSort) {
+    if (this._needsSort && !this.dense) {
       this._needsSort = false;
       this._sortRecords();
     }
@@ -98,13 +99,14 @@ export class Viewer {
     this.organMeshes.clear();
   }
 
-  setSubject(subject, edge) {
+  setSubject(subject, edge, dense = false) {
     this.clear();
     this.subject = subject;
     this.edge = edge;
+    this.dense = dense;
     for (const [organId, indices] of subject.byOrgan) {
       const geometry = new THREE.BoxGeometry(edge[0], edge[1], edge[2]);
-      const material = patchMaterial(this.planeList);
+      const material = patchMaterial(this.planeList, dense);
       const mesh = new THREE.InstancedMesh(geometry, material, indices.length);
       const opacity = new Float32Array(indices.length);
       geometry.setAttribute(OPACITY_ATTRIBUTE, new THREE.InstancedBufferAttribute(opacity, 1));
@@ -131,7 +133,7 @@ export class Viewer {
     const positions = this.subject.positions;
     const origin = this.camera.position;
     for (const record of this.organMeshes.values()) {
-      sortBackToFront(record.order, positions, origin);
+      if (!this.dense) sortBackToFront(record.order, positions, origin);
       this._writeMatrices(record);
     }
     this._applyColors();

@@ -48,3 +48,29 @@ describe("decodeSubject", () => {
     expect(subject.bounds.max).toEqual([1, 8, 3]);
   });
 });
+
+describe("decodeSubject voxel stride", () => {
+  function voxelBuffer(records) {
+    const array = new Float32Array(records.length * 4);
+    records.forEach((record, index) => array.set(record, index * 4));
+    return array.buffer;
+  }
+
+  it("decodes 4-float voxel records with a fixed organ", () => {
+    const buffer = voxelBuffer([
+      [1, 2, 3, 4],
+      [5, 6, 7, 8],
+    ]);
+    const subject = decodeSubject(buffer, { stride: 4, organId: 0 });
+    expect(subject.count).toBe(2);
+    expect(Array.from(subject.positions)).toEqual([1, 2, 3, 5, 6, 7]);
+    expect(Array.from(subject.suvMean)).toEqual([4, 8]);
+    expect(Array.from(subject.suvMin)).toEqual([4, 8]);
+    expect(Array.from(subject.suvMax)).toEqual([4, 8]);
+    expect(Array.from(subject.organId)).toEqual([0, 0]);
+    expect(subject.byOrgan.get(0)).toEqual([0, 1]);
+    expect(subject.bounds.min).toEqual([1, 2, 3]);
+    expect(subject.bounds.max).toEqual([5, 6, 7]);
+  });
+});
+
